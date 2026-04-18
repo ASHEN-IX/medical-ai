@@ -1,0 +1,4 @@
+packages:
+  - 'medical-web'
+  - 'medical-api'
+  - 'shared'

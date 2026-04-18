@@ -1,0 +1,184 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # ===== FRONTEND =====
+  test-frontend:
+    name: Test Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      
+      - name: Install pnpm
+        run: npm install -g pnpm
+      
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      
+      - name: Lint frontend
+        run: pnpm -F medical-web lint
+      
+      - name: Type check frontend
+        run: pnpm -F medical-web type-check
+      
+      - name: Build frontend
+        run: pnpm -F medical-web build
+      
+      - name: Test frontend
+        run: pnpm -F medical-web test
+
+  # ===== BACKEND =====
+  test-backend:
+    name: Test Backend
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: medai_test
+          POSTGRES_USER: medai_user
+          POSTGRES_PASSWORD: medai_password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      
+      - name: Install pnpm
+        run: npm install -g pnpm
+      
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      
+      - name: Setup database
+        run: |
+          cd medical-api
+          DATABASE_URL="postgresql://medai_user:medai_password@localhost:5432/medai_test" \
+          pnpm prisma migrate deploy
+      
+      - name: Lint backend
+        run: pnpm -F medical-api lint
+      
+      - name: Build backend
+        run: pnpm -F medical-api build
+      
+      - name: Test backend
+        run: pnpm -F medical-api test
+      
+      - name: Test backend E2E
+        run: pnpm -F medical-api test:e2e
+        env:
+          DATABASE_URL: "postgresql://medai_user:medai_password@localhost:5432/medai_test"
+
+  # ===== AI SERVICE =====
+  test-ai:
+    name: Test AI Service
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          cd ai-service
+          pip install -r requirements.txt
+      
+      - name: Lint AI service
+        run: |
+          cd ai-service
+          flake8 app/ --max-line-length=100
+      
+      - name: Type check AI service
+        run: |
+          cd ai-service
+          mypy app/ --ignore-missing-imports || true
+      
+      - name: Test AI service
+        run: |
+          cd ai-service
+          pytest --cov=app
+
+  # ===== BUILD DOCKER IMAGES =====
+  build-images:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: [test-frontend, test-backend, test-ai]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./medical-web
+          file: ./medical-web/Dockerfile.frontend
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Build and push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./medical-api
+          file: ./medical-api/Dockerfile.backend
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Build and push AI image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./ai-service
+          file: ./ai-service/Dockerfile.ai
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-ai:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

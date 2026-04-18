@@ -1,0 +1,86 @@
+// Prisma schema for MedAI Nexus Backend
+// Learn more at https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model for authentication and authorization
+model User {
+  id        String     @id @default(uuid())
+  name      String
+  email     String     @unique
+  password  String
+  role      UserRole   @default(PATIENT)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  // Relations
+  medicalReports MedicalReport[]
+  predictions    Prediction[]
+  logs           Log[]
+
+  @@index([email])
+}
+
+enum UserRole {
+  PATIENT
+  DOCTOR
+  ADMIN
+}
+
+// Medical Report model for storing metadata
+model MedicalReport {
+  id            String     @id @default(uuid())
+  userId        String
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileUrl       String
+  fileName      String?
+  extractedData Json?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  // Relations
+  predictions   Prediction[]
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// Prediction model for AI results
+model Prediction {
+  id            String     @id @default(uuid())
+  reportId      String
+  report        MedicalReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  disease       String
+  confidence    Float      @default(0.0)
+  explanation   String?
+  metadata      Json?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([reportId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// Audit Log model for system tracking
+model Log {
+  id        String     @id @default(uuid())
+  userId    String?
+  user      User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String
+  metadata  Json?
+  createdAt DateTime   @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
