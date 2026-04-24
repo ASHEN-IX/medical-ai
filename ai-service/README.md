@@ -42,6 +42,7 @@ ai-service/
 
 ## API Endpoints
 
+- POST /api/v1/ai/analyze
 - POST /api/v1/autism-dl/predict
 - POST /api/v1/autism-pred/predict
 - POST /api/v1/report/process
