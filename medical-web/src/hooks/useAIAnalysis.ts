@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  createElement,
   createContext,
   useCallback,
   useContext,
@@ -100,7 +101,7 @@ export function AIAnalysisProvider({ children }: { children: ReactNode }) {
     [analyze, clearError, currentAnalysis, error, history, loading, openHistoryItem, refreshHistory]
   );
 
-  return <AIAnalysisContext.Provider value={contextValue}>{children}</AIAnalysisContext.Provider>;
+  return createElement(AIAnalysisContext.Provider, { value: contextValue }, children);
 }
 
 export function useAIAnalysis(): AIAnalysisContextValue {
