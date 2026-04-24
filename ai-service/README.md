@@ -42,8 +42,10 @@ ai-service/
 
 ## API Endpoints
 
+- POST /api/v1/ai/analyze
 - POST /api/v1/autism-dl/predict
 - POST /api/v1/autism-pred/predict
+- POST /api/v1/report/process
 - GET /api/v1/autism-pred/categories
 - GET /api/v1/health
 
@@ -51,6 +53,7 @@ ai-service/
 
 ```bash
 pip install -r requirements.txt
+python -m spacy download en_core_web_sm
 python -m uvicorn app.main:app --reload --port 8001
 ```
 
