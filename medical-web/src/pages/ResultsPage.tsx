@@ -18,7 +18,7 @@ const CORE_MODELS = ["diabetes", "heart", "stroke"];
 export default function ResultsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const resultId = searchParams.get("id");
+  const resultId = searchParams?.get("id") || null;
 
   const { currentAnalysis, history, openHistoryItem, setCurrentAnalysis } = useAIAnalysis();
   const [loadingResult, setLoadingResult] = useState(false);
