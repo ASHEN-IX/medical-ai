@@ -71,6 +71,7 @@ services:
       - FASTAPI_ENV=development
       - FASTAPI_PORT=8001
       - FASTAPI_LOG_LEVEL=INFO
+      - SENTENCE_TRANSFORMERS_HOME=/data/sentence_transformers
       - OPENAI_API_KEY=${OPENAI_API_KEY:-sk-test-key}
       - NEO4J_URL=bolt://neo4j:7687
       - NEO4J_USERNAME=neo4j
@@ -80,6 +81,7 @@ services:
       - MODELS_PATH=/models
     volumes:
       - ./ai-service/app:/app/app
+      - ./ai-service/data/medical:/data/medical
       - ./ai-service/models:/models
       - ai-data:/data
     command: python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8001

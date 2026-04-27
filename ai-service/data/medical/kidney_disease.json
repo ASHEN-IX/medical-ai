@@ -1,0 +1,34 @@
+{
+  "disease": "kidney_disease",
+  "source": "WHO + NHS style medical summary",
+  "chunks": [
+    {
+      "type": "overview",
+      "text": "Kidney disease occurs when the kidneys can no longer remove waste and excess fluid from the bloodstream normally. It can be acute (sudden and often reversible) or chronic (progressive and often irreversible). Severe cases may require dialysis or kidney transplantation. It is strongly associated with diabetes, hypertension, and cardiovascular disease."
+    },
+    {
+      "type": "epidemiology",
+      "text": "Kidney disease is a major global health issue with increasing prevalence due to diabetes, high blood pressure, and ageing populations. Limited access to diagnosis and treatment increases mortality in low and middle income countries."
+    },
+    {
+      "type": "symptoms",
+      "text": "Kidney disease often has no symptoms in early stages. Advanced symptoms include fatigue, shortness of breath, swelling in legs or hands, nausea, vomiting, muscle cramps, generalized itching, and changes in urination."
+    },
+    {
+      "type": "causes",
+      "text": "Common causes include diabetes, high blood pressure, cardiovascular disease, kidney infections, glomerulonephritis, genetic conditions, urinary blockages, long-term NSAID use, and toxins."
+    },
+    {
+      "type": "diagnosis",
+      "text": "Chronic kidney disease is diagnosed using blood tests measuring serum creatinine and estimating glomerular filtration rate (eGFR). A persistent eGFR below 60 ml/min/1.73m² or abnormal albuminuria indicates CKD."
+    },
+    {
+      "type": "treatment",
+      "text": "Treatment focuses on slowing progression and managing complications. This includes lifestyle changes, blood pressure control, diabetes management, medications, dialysis, or kidney transplantation in advanced stages."
+    },
+    {
+      "type": "prevention",
+      "text": "Risk can be reduced through healthy lifestyle, regular physical activity, maintaining healthy weight, avoiding smoking, and controlling diabetes, hypertension, and cholesterol levels."
+    }
+  ]
+}

@@ -14,8 +14,10 @@ from app.api.routes.autism_dl import router as autism_dl_router
 from app.api.routes.autism_prediction import router as autism_prediction_router
 from app.api.routes.ai_gateway import router as ai_gateway_router
 from app.api.routes.kidney_disease import router as kidney_disease_router
+from app.api.routes.rag import router as rag_router
 from app.api.routes.report_processing import router as report_processing_router
 from app.models.schemas import ErrorDetail, ErrorResponse, HealthResponse
+from app.services.medical_rag_service import MedicalRagServiceError, medical_rag_service
 from app.services.model_loader import model_loader
 
 
@@ -30,6 +32,10 @@ logger = logging.getLogger("ai-service")
 async def lifespan(_: FastAPI):
     logger.info("Starting AI service and loading models...")
     model_loader.load_models()
+    try:
+        medical_rag_service.initialize()
+    except MedicalRagServiceError as exc:
+        logger.warning("Medical RAG initialization skipped at startup: %s", exc)
     logger.info(
         "Model startup loading finished | autism_dl=%s autism_pred=%s",
         "loaded" if model_loader.autism_dl_model is not None else "not_loaded",
@@ -143,4 +149,5 @@ app.include_router(autism_dl_router, prefix="/api/v1")
 app.include_router(autism_prediction_router, prefix="/api/v1")
 app.include_router(ai_gateway_router, prefix="/api/v1")
 app.include_router(kidney_disease_router, prefix="/api/v1")
+app.include_router(rag_router, prefix="/api/v1")
 app.include_router(report_processing_router, prefix="/api/v1")

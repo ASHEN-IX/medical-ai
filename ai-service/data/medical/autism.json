@@ -1,0 +1,34 @@
+{
+  "disease": "autism_spectrum_disorder",
+  "source": "WHO + clinical neurodevelopmental summary",
+  "chunks": [
+    {
+      "type": "overview",
+      "text": "Autism Spectrum Disorder (ASD) is a neurodevelopmental condition characterized by difficulties in social interaction and communication, along with restricted or repetitive behaviors, sensory sensitivities, and differences in learning and behavior."
+    },
+    {
+      "type": "epidemiology",
+      "text": "Globally, about 1 in 127 people are estimated to have autism. Prevalence varies widely and is still under-researched in many low and middle income countries."
+    },
+    {
+      "type": "symptoms",
+      "text": "Symptoms include difficulty in social communication, reduced eye contact, delayed speech development, repetitive behaviors, strong preference for routines, intense interests, and sensory sensitivities."
+    },
+    {
+      "type": "causes",
+      "text": "Autism has no single known cause. It is linked to genetic and environmental factors including parental age, prenatal exposure to pollutants, complications during birth, premature birth, and certain genetic variations. Vaccines do not cause autism."
+    },
+    {
+      "type": "diagnosis",
+      "text": "Diagnosis is based on behavioral observation, developmental history, and clinical assessment by specialists such as psychologists or pediatricians. There is no blood test or brain scan that diagnoses autism."
+    },
+    {
+      "type": "support",
+      "text": "Support includes early intervention, behavioral therapies, educational support, speech therapy, occupational therapy, and individualized care plans. There is no cure, but quality of life can be significantly improved with support."
+    },
+    {
+      "type": "living_with_autism",
+      "text": "Autistic individuals can live independent and successful lives depending on support needs. Strengths may include attention to detail, deep focus on interests, honesty, and creativity."
+    }
+  ]
+}
