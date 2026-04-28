@@ -5,6 +5,8 @@ from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.models.llm_schema import LLMExplanationResponse
+
 
 RiskLevel = Literal["LOW", "MEDIUM", "HIGH"]
 PriorityLevel = Literal["LOW", "MEDIUM", "URGENT"]
@@ -42,4 +44,5 @@ class GatewayAnalyzeResponse(BaseModel):
     results: Dict[str, GatewayModelResult]
     final_assessment: FinalAssessment
     reasoning: List[str]
+    llm_explanation: Optional[LLMExplanationResponse] = None
     metadata: GatewayMetadata

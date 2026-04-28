@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from datetime import datetime, timezone
@@ -11,6 +12,9 @@ from app.models.gateway_schema import (
     GatewayAnalyzeResponse,
     GatewayMetadata,
 )
+from app.models.llm_schema import LLMExplanationResponse
+from app.services.llm_service import LLMService, LLMServiceError
+from app.services.medical_rag_service import MedicalRagServiceError, medical_rag_service
 from app.services.model_orchestrator import ModelOrchestrator
 from app.services.routing_engine import RoutingEngine
 from app.utils.risk_aggregator import aggregate_overall_risk, build_reasoning, priority_from_risk
@@ -32,9 +36,11 @@ class GatewayService:
         self,
         routing_engine: RoutingEngine | None = None,
         model_orchestrator: ModelOrchestrator | None = None,
+        llm_service: LLMService | None = None,
     ) -> None:
         self.routing_engine = routing_engine or RoutingEngine()
         self.model_orchestrator = model_orchestrator or ModelOrchestrator()
+        self.llm_service = llm_service or LLMService()
 
     async def analyze(self, payload: GatewayAnalyzeRequest, request_id: str) -> GatewayAnalyzeResponse:
         started = time.perf_counter()
@@ -83,6 +89,26 @@ class GatewayService:
         if not payload.include_explanation:
             reasoning = []
 
+        llm_explanation: LLMExplanationResponse | None = None
+        if payload.include_explanation:
+            rag_context = await self._build_rag_context(
+                report_type=payload.report_type,
+                features=features,
+                symptoms=payload.symptoms,
+                selected_models=selected_models,
+                request_id=request_id,
+            )
+            try:
+                llm_payload = await self.llm_service.generate_explanation(
+                    model_results=orchestration_result.results,
+                    features=features,
+                    rag_context=rag_context,
+                    request_id=request_id,
+                )
+                llm_explanation = LLMExplanationResponse.model_validate(llm_payload)
+            except LLMServiceError as exc:
+                logger.warning("LLM explanation skipped request_id=%s error=%s", request_id, exc)
+
         duration_ms = int((time.perf_counter() - started) * 1000)
         logger.info(
             "AI gateway completed request_id=%s overall_risk=%s priority=%s duration_ms=%s failures=%s",
@@ -99,11 +125,30 @@ class GatewayService:
             results=orchestration_result.results,
             final_assessment=FinalAssessment(overall_risk=overall_risk, priority=priority),
             reasoning=reasoning,
+            llm_explanation=llm_explanation,
             metadata=GatewayMetadata(
                 processing_time_ms=duration_ms,
                 timestamp=datetime.now(timezone.utc),
             ),
         )
+
+    async def _build_rag_context(
+        self,
+        report_type: str,
+        features: Mapping[str, Any],
+        symptoms: list[str],
+        selected_models: list[str],
+        request_id: str,
+    ) -> list[str]:
+        rag_query = self._build_rag_query(report_type, features, symptoms, selected_models)
+
+        try:
+            hits = await asyncio.to_thread(medical_rag_service.retrieve, rag_query, 3)
+        except MedicalRagServiceError as exc:
+            logger.warning("RAG context unavailable request_id=%s error=%s", request_id, exc)
+            return []
+
+        return [f"{hit.disease} | {hit.type} | {hit.text}" for hit in hits]
 
     def _validate_payload(self, payload: GatewayAnalyzeRequest, features: Mapping[str, Any]) -> None:
         if not features and not payload.image and not payload.symptoms:
@@ -131,6 +176,23 @@ class GatewayService:
             normalized[key] = value
 
         return normalized
+
+    def _build_rag_query(
+        self,
+        report_type: str,
+        features: Mapping[str, Any],
+        symptoms: list[str],
+        selected_models: list[str],
+    ) -> str:
+        feature_terms = []
+        for key, value in list(features.items())[:10]:
+            feature_terms.append(f"{key} {value}")
+
+        symptom_terms = ", ".join(symptoms[:8]) if symptoms else ""
+        model_terms = ", ".join(selected_models[:6]) if selected_models else ""
+
+        parts = [report_type, model_terms, symptom_terms, " ".join(feature_terms)]
+        return " ".join(part for part in parts if part).strip() or "medical explanation"
 
 
 def llm_reasoning(features: dict[str, Any], results: dict[str, dict[str, Any]]) -> None:
