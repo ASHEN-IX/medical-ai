@@ -5,11 +5,16 @@ WORKDIR /app
 # Install pnpm
 RUN npm install -g pnpm
 
+# Make registry fetches more resilient in slow/unreliable networks.
+RUN pnpm config set fetch-retries 5 && \
+	pnpm config set fetch-timeout 600000 && \
+	pnpm config set network-concurrency 1
+
 # Copy package files
 COPY package.json pnpm-lock.yaml* ./
 
 # Install dependencies
-RUN pnpm install
+RUN pnpm install --prefer-offline
 
 # Copy source code
 COPY . .

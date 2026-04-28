@@ -27,9 +27,15 @@ pytesseract==0.3.10
 PyPDF2==3.0.1
 spacy==3.7.2
 nltk==3.8.1
-# Run once after install:
-# python -m spacy download en_core_web_sm
 
 # Utilities
 python-multipart==0.0.6
+requests==2.31.0
 httpx==0.25.0
+
+# Development & Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+black==23.11.0
+flake8==6.1.0
+mypy==1.7.0
