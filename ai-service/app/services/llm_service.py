@@ -9,6 +9,7 @@ from typing import Any, Mapping
 from groq import Groq
 from pydantic import ValidationError
 
+from app.knowledge_graph.kg_schema import KnowledgeGraphContext
 from app.models.llm_schema import LLMExplanationResponse
 from app.services.llm_guardrails import build_safe_fallback_response, ensure_safe_explanation
 from app.services.prompt_builder import build_explanation_messages
@@ -38,6 +39,7 @@ class LLMService:
         model_results: dict[str, Any],
         features: dict[str, Any],
         rag_context: list[str],
+        kg_context: KnowledgeGraphContext | None = None,
         request_id: str | None = None,
     ) -> dict[str, Any]:
         return await asyncio.to_thread(
@@ -45,6 +47,7 @@ class LLMService:
             model_results,
             features,
             rag_context,
+            kg_context,
             request_id,
         )
 
@@ -53,12 +56,13 @@ class LLMService:
         model_results: dict[str, Any],
         features: dict[str, Any],
         rag_context: list[str],
+        kg_context: KnowledgeGraphContext | None,
         request_id: str | None,
     ) -> dict[str, Any]:
         if not os.getenv("GROQ_API_KEY"):
             raise LLMServiceError("GROQ_API_KEY is not configured")
 
-        messages = build_explanation_messages(model_results, features, rag_context)
+        messages = build_explanation_messages(model_results, features, rag_context, kg_context)
         logger.info(
             "LLM explanation request started request_id=%s model=%s model_result_keys=%s feature_keys=%s rag_chunks=%s",
             request_id,

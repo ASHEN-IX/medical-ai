@@ -6,6 +6,8 @@ import time
 from datetime import datetime, timezone
 from typing import Any, Mapping
 
+from app.knowledge_graph.kg_schema import KnowledgeGraphContext
+from app.knowledge_graph.kg_service import KnowledgeGraphServiceError, knowledge_graph_service
 from app.models.gateway_schema import (
     FinalAssessment,
     GatewayAnalyzeRequest,
@@ -98,11 +100,13 @@ class GatewayService:
                 selected_models=selected_models,
                 request_id=request_id,
             )
+            kg_context = await self._build_kg_context(selected_models, request_id=request_id)
             try:
                 llm_payload = await self.llm_service.generate_explanation(
                     model_results=orchestration_result.results,
                     features=features,
                     rag_context=rag_context,
+                    kg_context=kg_context,
                     request_id=request_id,
                 )
                 llm_explanation = LLMExplanationResponse.model_validate(llm_payload)
@@ -149,6 +153,16 @@ class GatewayService:
             return []
 
         return [f"{hit.disease} | {hit.type} | {hit.text}" for hit in hits]
+
+    async def _build_kg_context(self, selected_models: list[str], request_id: str) -> KnowledgeGraphContext:
+        try:
+            return await asyncio.to_thread(knowledge_graph_service.get_context_for_models, selected_models)
+        except KnowledgeGraphServiceError as exc:
+            logger.warning("Knowledge graph context unavailable request_id=%s error=%s", request_id, exc)
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.warning("Knowledge graph context failed request_id=%s error=%s", request_id, exc)
+
+        return KnowledgeGraphContext()
 
     def _validate_payload(self, payload: GatewayAnalyzeRequest, features: Mapping[str, Any]) -> None:
         if not features and not payload.image and not payload.symptoms:
