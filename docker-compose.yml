@@ -71,6 +71,8 @@ services:
       - FASTAPI_ENV=development
       - FASTAPI_PORT=8001
       - FASTAPI_LOG_LEVEL=INFO
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - GROQ_MODEL=${GROQ_MODEL:-openai/gpt-oss-120b}
       - SENTENCE_TRANSFORMERS_HOME=/data/sentence_transformers
       - OPENAI_API_KEY=${OPENAI_API_KEY:-sk-test-key}
       - NEO4J_URL=bolt://neo4j:7687
