@@ -64,6 +64,8 @@ class RoutingEngine:
         # If the features contain autism questionnaire answers, route to autism_pred
         if any(key.strip().lower().startswith("a") and key.strip().lower().endswith("_score") for key in features.keys()):
             selected_models.add("autism_pred")
+        if isinstance(features.get("responses"), dict):
+            selected_models.add("autism_pred")
 
         if normalized_report_type == "mixed" and not selected_models:
             selected_models.update({"diabetes", "heart", "kidney", "stroke"})

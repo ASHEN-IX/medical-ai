@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.6
 FROM node:20-alpine
 
 WORKDIR /app
@@ -11,10 +12,11 @@ RUN pnpm config set fetch-retries 5 && \
 	pnpm config set network-concurrency 1
 
 # Copy package files
-COPY package.json pnpm-lock.yaml* ./
+COPY package.json ./
 
 # Install dependencies
-RUN pnpm install --prefer-offline
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+	pnpm install --prefer-offline
 
 # Copy source code
 COPY . .

@@ -1,15 +1,29 @@
 import axios from "axios";
 
-export type ReportType = "auto" | "diabetes" | "heart" | "kidney" | "stroke" | "mixed";
+export type ReportType = "auto" | "diabetes" | "heart" | "kidney" | "stroke" | "autism" | "mixed";
 export type RiskLevel = "LOW" | "MEDIUM" | "HIGH";
 export type PriorityLevel = "LOW" | "MEDIUM" | "URGENT";
 
 export interface AnalyzeReportPayload {
   report_type: ReportType;
   features: Record<string, number>;
+  raw_text?: string;
   include_explanation?: boolean;
   symptoms?: string[];
   image?: string;
+}
+
+export interface ProcessReportResponse {
+  success: boolean;
+  report_type: string;
+  features: Record<string, number>;
+  confidence_scores: Record<string, number>;
+  raw_text: string;
+  metadata: {
+    processing_time_ms: number;
+    timestamp: string;
+    extraction_method: string;
+  };
 }
 
 export interface GatewayModelResult {
@@ -87,7 +101,7 @@ export interface AnalysisHistoryItem {
 const HISTORY_STORAGE_KEY = "medai-nexus-analysis-history-v1";
 
 const aiGatewayApi = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_AI_GATEWAY_URL || "http://localhost:8000",
+  baseURL: process.env.NEXT_PUBLIC_AI_GATEWAY_URL || "http://localhost:8001",
   timeout: 20000,
   headers: {
     "Content-Type": "application/json",
@@ -182,6 +196,24 @@ function writeHistoryToStorage(history: AnalysisHistoryItem[]): void {
 export async function analyzeReport(payload: AnalyzeReportPayload): Promise<GatewayAnalyzeResponse> {
   try {
     const { data } = await aiGatewayApi.post<GatewayAnalyzeResponse>("/api/v1/ai/analyze", payload);
+    return data;
+  } catch (error) {
+    throw normalizeError(error);
+  }
+}
+
+export async function processReportFile(file: File): Promise<ProcessReportResponse> {
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const { data } = await aiGatewayApi.post<ProcessReportResponse>("/api/v1/report/process", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+      timeout: 30000,
+    });
+
     return data;
   } catch (error) {
     throw normalizeError(error);

@@ -10,7 +10,7 @@ from app.models.llm_schema import LLMExplanationResponse
 
 RiskLevel = Literal["LOW", "MEDIUM", "HIGH"]
 PriorityLevel = Literal["LOW", "MEDIUM", "URGENT"]
-ReportType = Literal["auto", "diabetes", "heart", "kidney", "stroke", "mixed"]
+ReportType = Literal["auto", "diabetes", "heart", "kidney", "stroke", "autism", "mixed"]
 
 
 class GatewayAnalyzeRequest(BaseModel):

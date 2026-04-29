@@ -102,6 +102,7 @@ pnpm dev
 ```bash
 # .env.local
 NEXT_PUBLIC_API_URL=http://localhost:4000
+NEXT_PUBLIC_AI_GATEWAY_URL=http://localhost:8001
 NEXT_PUBLIC_APP_NAME=MedAI Nexus
 ```
 

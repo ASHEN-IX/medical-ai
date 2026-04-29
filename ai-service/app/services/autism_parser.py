@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 _A_SCORE_PATTERN = re.compile(r"\bA(\d{1,2})[_\s:-]*\s*(?:Score)?\s*[:=]?\s*([01])\b", re.IGNORECASE)
 _A_SCORE_ALT_PATTERN = re.compile(r"\bA(\d{1,2})\b\s*[\-\)]?\s*[:\)]?\s*(yes|no|1|0)\b", re.IGNORECASE)
+_A_ITEM_PATTERN = re.compile(r"\bA(\d{1,2})\b", re.IGNORECASE)
 
 _AGE_PATTERN = re.compile(r"\bage\b[^\d]{0,3}(\d{1,3})\b", re.IGNORECASE)
 _GENDER_PATTERN = re.compile(r"\b(male|female|m|f)\b", re.IGNORECASE)
@@ -32,6 +33,22 @@ def _extract_binary_answers(text: str) -> dict[str, int]:
                 val = m.group(2).lower()
                 answers[f"A{idx}_Score"] = 1 if val in {"yes", "1", "y"} else 0
 
+    if len(answers) < 10:
+        item_matches = list(_A_ITEM_PATTERN.finditer(text))
+        for index, match in enumerate(item_matches):
+            idx = int(match.group(1))
+            if not 1 <= idx <= 10 or f"A{idx}_Score" in answers:
+                continue
+
+            next_start = item_matches[index + 1].start() if index + 1 < len(item_matches) else len(text)
+            segment = text[match.end() : next_start]
+            segment_matches = list(re.finditer(r"\b(yes|no|1|0)\b", segment, re.IGNORECASE))
+            if not segment_matches:
+                continue
+
+            val = segment_matches[-1].group(1).lower()
+            answers[f"A{idx}_Score"] = 1 if val in {"yes", "1"} else 0
+
     return answers
 
 
@@ -51,9 +68,9 @@ def _extract_gender(text: str) -> str | None:
         return None
     val = m.group(1).lower()
     if val.startswith("m"):
-        return "m"
+        return "0"
     if val.startswith("f"):
-        return "f"
+        return "1"
     return None
 
 
@@ -75,7 +92,7 @@ def parse_autism_prediction_request(text: str) -> PredictionRequest:
     if age is None:
         age = 0
 
-    gender = _extract_gender(text) or "m"
+    gender = int(_extract_gender(text) or "0")
 
     # best-effort extraction for other categorical fields using simple heuristics
     jaundice = None
@@ -95,7 +112,7 @@ def parse_autism_prediction_request(text: str) -> PredictionRequest:
         jaundice=jaundice,
         relation=None,
         austim=None,
-        contry_of_res=None,
+        contry_of_res=0,
         used_app_before=None,
         result=None,
     )

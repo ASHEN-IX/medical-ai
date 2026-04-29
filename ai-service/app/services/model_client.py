@@ -95,8 +95,12 @@ class ModelClient:
         return await self._predict_model("autism_dl", {"image": image_base64}, request_id, payload_only=[payload])
 
     async def predict_autism_pred(self, features: Mapping[str, Any], request_id: str) -> ModelPrediction:
-        # The autism prediction endpoint expects a structured payload: {"responses": {...}, "demographics": {...}}
-        return await self._predict_model("autism_pred", features, request_id)
+        # The autism prediction endpoint expects a strict payload: {"responses": {...}, "demographics": {...}}
+        payload = {
+            "responses": dict(features.get("responses") or {}),
+            "demographics": dict(features.get("demographics") or {}),
+        }
+        return await self._predict_model("autism_pred", features, request_id, payload_only=[payload])
 
     async def _predict_model(
         self,
@@ -234,6 +238,22 @@ class ModelClient:
         model_name: str,
         payload: Mapping[str, Any],
     ) -> ModelPrediction:
+        if payload.get("success") is False:
+            return ModelPrediction(
+                model=model_name,
+                risk="LOW",
+                confidence=0.0,
+                source="endpoint",
+                success=False,
+                error=self._first_non_empty(
+                    payload.get("message"),
+                    payload.get("error"),
+                    str(payload.get("detail")) if payload.get("detail") is not None else None,
+                )
+                or "Model endpoint reported failure",
+                raw_response=dict(payload),
+            )
+
         prediction = payload.get("prediction") if isinstance(payload.get("prediction"), dict) else {}
 
         risk_candidate = self._first_non_empty(
@@ -343,6 +363,23 @@ class ModelClient:
                 risk, confidence = "LOW", 0.58
         elif model_name == "autism_dl":
             risk, confidence = "LOW", 0.55
+        elif model_name == "autism_pred":
+            responses = features.get("responses")
+            if isinstance(responses, Mapping):
+                score_total = 0
+                for idx in range(1, 11):
+                    value = self._to_float(responses.get(f"A{idx}_Score"))
+                    if value is not None and value >= 1:
+                        score_total += 1
+
+                if score_total >= 7:
+                    risk, confidence = "HIGH", 0.84
+                elif score_total >= 4:
+                    risk, confidence = "MEDIUM", 0.72
+                else:
+                    risk, confidence = "LOW", 0.62
+            else:
+                risk, confidence = "LOW", 0.55
         else:
             risk, confidence = "LOW", 0.5
 
