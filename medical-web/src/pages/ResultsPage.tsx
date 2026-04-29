@@ -13,7 +13,7 @@ import {
   riskProgressValue,
 } from "@/utils/formatters";
 
-const CORE_MODELS = ["diabetes", "heart", "stroke"];
+const CORE_MODELS = ["diabetes", "heart", "kidney", "stroke"];
 
 export default function ResultsPage() {
   const router = useRouter();
@@ -175,6 +175,40 @@ export default function ResultsPage() {
           <p className="mt-3 text-sm text-slate-500">No explanation provided for this analysis run.</p>
         )}
       </article>
+
+      {response.rag_context.length > 0 ? (
+        <article className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-900">RAG Context</h2>
+          <ul className="mt-3 space-y-2 text-sm text-slate-700">
+            {response.rag_context.map((item, index) => (
+              <li key={`${item}-${index}`} className="rounded-lg bg-slate-50 px-3 py-2">
+                {item}
+              </li>
+            ))}
+          </ul>
+        </article>
+      ) : null}
+
+      {response.kg_insights.connections.length > 0 ? (
+        <article className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-900">Knowledge Graph Insights</h2>
+          <p className="mt-3 text-sm text-slate-700">{response.kg_insights.connections.slice(0, 10).join(" • ")}</p>
+        </article>
+      ) : null}
+
+      {response.llm_explanation_text ? (
+        <article className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-900">LLM Explanation</h2>
+          <p className="mt-3 text-sm text-slate-700">{response.llm_explanation_text}</p>
+        </article>
+      ) : null}
+
+      {response.final_decision ? (
+        <article className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-900">Final Decision</h2>
+          <p className="mt-3 text-sm font-semibold text-cyan-700">{response.final_decision}</p>
+        </article>
+      ) : null}
 
       <article className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
         <h2 className="text-lg font-semibold text-slate-900">Metadata</h2>

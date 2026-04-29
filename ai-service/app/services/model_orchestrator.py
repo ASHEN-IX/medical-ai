@@ -16,6 +16,7 @@ class OrchestrationResult:
     results: dict[str, dict[str, str | float]] = field(default_factory=dict)
     failures: dict[str, str] = field(default_factory=dict)
     fallback_models: list[str] = field(default_factory=list)
+    details: dict[str, ModelPrediction] = field(default_factory=dict)
 
 
 class ModelOrchestrator:
@@ -40,6 +41,8 @@ class ModelOrchestrator:
                 tasks[model_name] = asyncio.create_task(self.model_client.predict_diabetes(features, request_id))
             elif model_name == "heart":
                 tasks[model_name] = asyncio.create_task(self.model_client.predict_heart(features, request_id))
+            elif model_name == "kidney":
+                tasks[model_name] = asyncio.create_task(self.model_client.predict_kidney(features, request_id))
             elif model_name == "stroke":
                 tasks[model_name] = asyncio.create_task(
                     self.model_client.predict_stroke(features, request_id, symptoms=symptoms)
@@ -51,6 +54,9 @@ class ModelOrchestrator:
                 tasks[model_name] = asyncio.create_task(
                     self.model_client.predict_autism_dl(image_base64, request_id)
                 )
+            elif model_name == "autism_pred":
+                # autism_pred requires the survey responses + demographics in features
+                tasks[model_name] = asyncio.create_task(self.model_client.predict_autism_pred(features, request_id))
             else:
                 orchestrated.failures[model_name] = "Unsupported model requested"
 
@@ -69,6 +75,7 @@ class ModelOrchestrator:
                 orchestrated.failures[model_name] = outcome.error or "Model call failed"
                 continue
 
+            orchestrated.details[model_name] = outcome
             orchestrated.results[model_name] = {
                 "risk": outcome.risk,
                 "confidence": round(outcome.confidence, 2),

@@ -6,8 +6,12 @@ import logging
 import os
 from typing import Any, Mapping
 
-from groq import Groq
 from pydantic import ValidationError
+
+try:
+    from groq import Groq
+except ImportError:  # pragma: no cover - optional dependency for local fallback mode
+    Groq = None
 
 from app.knowledge_graph.kg_schema import KnowledgeGraphContext
 from app.models.llm_schema import LLMExplanationResponse
@@ -32,7 +36,12 @@ class LLMService:
         self.model_name = model_name or os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
         self.temperature = temperature
         api_key = os.getenv("GROQ_API_KEY")
-        self.client = client or Groq(api_key=api_key)
+        if client is not None:
+            self.client = client
+        elif Groq is None:
+            self.client = None
+        else:
+            self.client = Groq(api_key=api_key)
 
     async def generate_explanation(
         self,
@@ -61,6 +70,9 @@ class LLMService:
     ) -> dict[str, Any]:
         if not os.getenv("GROQ_API_KEY"):
             raise LLMServiceError("GROQ_API_KEY is not configured")
+
+        if self.client is None:
+            raise LLMServiceError("Groq client is not available in the current environment")
 
         messages = build_explanation_messages(model_results, features, rag_context, kg_context)
         logger.info(

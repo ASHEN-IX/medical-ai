@@ -7,7 +7,7 @@ import FileUploader from "@/components/FileUploader";
 import { useAIAnalysis } from "@/hooks/useAIAnalysis";
 import type { AnalyzeReportPayload, ReportType } from "@/services/api";
 
-const REPORT_TYPES: ReportType[] = ["auto", "diabetes", "heart", "stroke", "mixed"];
+const REPORT_TYPES: ReportType[] = ["auto", "diabetes", "heart", "kidney", "stroke", "mixed"];
 
 const FEATURE_FIELDS: Array<{ key: keyof AnalyzeReportPayload["features"] | string; label: string; placeholder: string }> = [
   { key: "glucose", label: "Glucose (mg/dL)", placeholder: "180" },
