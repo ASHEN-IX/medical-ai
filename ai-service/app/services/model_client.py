@@ -39,8 +39,20 @@ class ModelClient:
     DEFAULT_ENDPOINTS = {
         "diabetes": ["/api/v1/diabetes/predict", "/api/v1/diabetes-risk/predict"],
         "heart": ["/api/v1/heart/predict", "/api/v1/heart-disease/predict"],
+        "kidney": ["/api/v1/kidney-disease/predict"],
         "stroke": ["/api/v1/stroke/predict", "/api/v1/stroke-risk/predict"],
         "autism_dl": ["/api/v1/autism-dl/predict"],
+        "autism_pred": ["/api/v1/autism-pred/predict"],
+    }
+
+    KIDNEY_DEFAULT_PAYLOAD = {
+        "age": 50,
+        "hemo": 13.5,
+        "sg": 1.02,
+        "al": 0,
+        "pcv": 40,
+        "sc": 1.0,
+        "htn": 0,
     }
 
     def __init__(
@@ -60,6 +72,10 @@ class ModelClient:
     async def predict_heart(self, features: Mapping[str, Any], request_id: str) -> ModelPrediction:
         return await self._predict_model("heart", features, request_id)
 
+    async def predict_kidney(self, features: Mapping[str, Any], request_id: str) -> ModelPrediction:
+        payload = self._build_kidney_payload(features)
+        return await self._predict_model("kidney", payload, request_id, payload_only=[payload])
+
     async def predict_stroke(
         self,
         features: Mapping[str, Any],
@@ -77,6 +93,10 @@ class ModelClient:
             "return_heatmap": False,
         }
         return await self._predict_model("autism_dl", {"image": image_base64}, request_id, payload_only=[payload])
+
+    async def predict_autism_pred(self, features: Mapping[str, Any], request_id: str) -> ModelPrediction:
+        # The autism prediction endpoint expects a structured payload: {"responses": {...}, "demographics": {...}}
+        return await self._predict_model("autism_pred", features, request_id)
 
     async def _predict_model(
         self,
@@ -291,6 +311,25 @@ class ModelClient:
                 risk, confidence = "MEDIUM", 0.7
             else:
                 risk, confidence = "LOW", 0.6
+        elif model_name == "kidney":
+            creatinine = self._to_float(features.get("creatinine"))
+            blood_pressure = self._to_float(features.get("blood_pressure"))
+            age = self._to_float(features.get("age"))
+            score = 0
+
+            if creatinine is not None and creatinine >= 1.5:
+                score += 1
+            if blood_pressure is not None and blood_pressure > 130:
+                score += 1
+            if age is not None and age >= 60:
+                score += 1
+
+            if score >= 2:
+                risk, confidence = "HIGH", 0.82
+            elif score == 1:
+                risk, confidence = "MEDIUM", 0.7
+            else:
+                risk, confidence = "LOW", 0.6
         elif model_name == "stroke":
             age = self._to_float(features.get("age"))
             has_neuro = bool(features.get("neurological_symptoms")) or self._contains_neuro_symptoms(
@@ -387,3 +426,39 @@ class ModelClient:
             "stroke",
         }
         return any(any(keyword in candidate for keyword in keywords) for candidate in candidates)
+
+    def _build_kidney_payload(self, features: Mapping[str, Any]) -> dict[str, Any]:
+        payload = dict(self.KIDNEY_DEFAULT_PAYLOAD)
+
+        if (age := self._to_float(features.get("age"))) is not None:
+            payload["age"] = age
+
+        if (hemo := self._to_float(features.get("hemo"))) is not None:
+            payload["hemo"] = hemo
+
+        if (sg := self._to_float(features.get("sg"))) is not None:
+            payload["sg"] = sg
+
+        if (al := self._to_float(features.get("al"))) is not None:
+            payload["al"] = int(round(al))
+
+        if (pcv := self._to_float(features.get("pcv"))) is not None:
+            payload["pcv"] = pcv
+
+        sc_value = self._to_float(features.get("sc"))
+        if sc_value is None:
+            sc_value = self._to_float(features.get("creatinine"))
+        if sc_value is not None:
+            payload["sc"] = sc_value
+
+        hypertension = features.get("htn")
+        if isinstance(hypertension, (int, float)):
+            payload["htn"] = 1 if float(hypertension) >= 1 else 0
+        elif isinstance(hypertension, str):
+            payload["htn"] = 1 if hypertension.strip().lower() in {"1", "true", "yes", "y"} else 0
+        else:
+            blood_pressure = self._to_float(features.get("blood_pressure"))
+            if blood_pressure is not None:
+                payload["htn"] = 1 if blood_pressure > 130 else 0
+
+        return payload

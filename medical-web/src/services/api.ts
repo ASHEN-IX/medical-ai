@@ -1,6 +1,6 @@
 import axios from "axios";
 
-export type ReportType = "auto" | "diabetes" | "heart" | "stroke" | "mixed";
+export type ReportType = "auto" | "diabetes" | "heart" | "kidney" | "stroke" | "mixed";
 export type RiskLevel = "LOW" | "MEDIUM" | "HIGH";
 export type PriorityLevel = "LOW" | "MEDIUM" | "URGENT";
 
@@ -17,8 +17,46 @@ export interface GatewayModelResult {
   confidence: number;
 }
 
+export interface GatewayModelDetail extends GatewayModelResult {
+  source?: string;
+  success?: boolean;
+  error?: string | null;
+  raw_response?: Record<string, unknown> | null;
+}
+
+export interface RiskAssessment {
+  overall_risk: RiskLevel;
+  priority: PriorityLevel;
+  final_decision: string;
+  rationale: string[];
+}
+
+export interface KnowledgeGraphInsights {
+  diseases: string[];
+  symptoms: string[];
+  risk_factors: string[];
+  complications: string[];
+  treatments: string[];
+  connections: string[];
+}
+
 export interface GatewayAnalyzeResponse {
   success: boolean;
+  request_id: string;
+  inputs: {
+    report_type: ReportType;
+    include_explanation: boolean;
+    symptoms: string[];
+    has_image: boolean;
+    has_raw_text: boolean;
+  };
+  extracted_features: Record<string, unknown>;
+  model_outputs: Record<string, GatewayModelDetail>;
+  rag_context: string[];
+  kg_insights: KnowledgeGraphInsights;
+  risk_assessment: RiskAssessment;
+  llm_explanation_text: string;
+  final_decision: string;
   selected_models: string[];
   results: Record<string, GatewayModelResult>;
   final_assessment: {
@@ -26,6 +64,13 @@ export interface GatewayAnalyzeResponse {
     priority: PriorityLevel;
   };
   reasoning: string[];
+  llm_explanation?: {
+    summary: string;
+    explanation: string[];
+    risk_interpretation: { level: RiskLevel; meaning: string };
+    recommendations: string[];
+    safety_note: string;
+  } | null;
   metadata: {
     processing_time_ms: number;
     timestamp: string;

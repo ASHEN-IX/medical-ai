@@ -139,7 +139,8 @@ class KnowledgeGraphBuilder:
 
     def _merge_related_entity(self, session, disease: str, name: str, relationship: str) -> None:
         label = RELATION_TO_LABEL[relationship]
-        query = MERGE_RELATED_ENTITY_QUERY.format(label=label, relationship=relationship)
+        # Use simple replacement to avoid interfering with Cypher parameter braces
+        query = MERGE_RELATED_ENTITY_QUERY.replace("{label}", label).replace("{relationship}", relationship)
         session.run(query, disease=disease, name=name)
 
     def _build_profile(self, document: MedicalKnowledgeDocumentInput, source_file: str) -> KnowledgeGraphSeed:

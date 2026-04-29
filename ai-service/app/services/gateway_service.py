@@ -3,11 +3,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+import re
 from datetime import datetime, timezone
 from typing import Any, Mapping
 
 from app.knowledge_graph.kg_schema import KnowledgeGraphContext
-from app.knowledge_graph.kg_service import KnowledgeGraphServiceError, knowledge_graph_service
 from app.models.gateway_schema import (
     FinalAssessment,
     GatewayAnalyzeRequest,
@@ -15,9 +15,14 @@ from app.models.gateway_schema import (
     GatewayMetadata,
 )
 from app.models.llm_schema import LLMExplanationResponse
+from app.services.analysis_aggregator import AnalysisResponseAggregator
+from app.services.kg_client import KGClient, KGClientError
 from app.services.llm_service import LLMService, LLMServiceError
-from app.services.medical_rag_service import MedicalRagServiceError, medical_rag_service
+from app.services.medical_rag_service import MedicalRagServiceError
+from app.services.nlp_service import NLPService
+from app.services.autism_parser import parse_autism_prediction_request
 from app.services.model_orchestrator import ModelOrchestrator
+from app.services.rag_client import RAGClient, RAGClientError
 from app.services.routing_engine import RoutingEngine
 from app.utils.risk_aggregator import aggregate_overall_risk, build_reasoning, priority_from_risk
 
@@ -39,19 +44,47 @@ class GatewayService:
         routing_engine: RoutingEngine | None = None,
         model_orchestrator: ModelOrchestrator | None = None,
         llm_service: LLMService | None = None,
+        rag_client: RAGClient | None = None,
+        kg_client: KGClient | None = None,
+        nlp_service: NLPService | None = None,
+        response_aggregator: AnalysisResponseAggregator | None = None,
     ) -> None:
         self.routing_engine = routing_engine or RoutingEngine()
         self.model_orchestrator = model_orchestrator or ModelOrchestrator()
         self.llm_service = llm_service or LLMService()
+        self.rag_client = rag_client or RAGClient()
+        self.kg_client = kg_client or KGClient()
+        self.nlp_service = nlp_service or NLPService()
+        self.response_aggregator = response_aggregator or AnalysisResponseAggregator()
 
     async def analyze(self, payload: GatewayAnalyzeRequest, request_id: str) -> GatewayAnalyzeResponse:
         started = time.perf_counter()
         features = self._normalize_features(payload.features)
+        raw_text = getattr(payload, "raw_text", None)
+        extracted_report_type = str(payload.report_type)
+
+        if raw_text:
+            nlp_result = await asyncio.to_thread(self.nlp_service.process_text, raw_text)
+            extracted_report_type = nlp_result.report_type if nlp_result.report_type != "general" else extracted_report_type
+            extracted_features = self._normalize_features(nlp_result.features)
+            merged_features = dict(extracted_features)
+            merged_features.update(features)
+            features = merged_features
+
+            # If this looks like an autism screening, parse the questionnaire and add structured payload
+            try:
+                if extracted_report_type == "autism" or re.search(r"\bA(?:[1-9]|10)[_\s:-]*Score\b", raw_text, re.IGNORECASE):
+                    parsed = parse_autism_prediction_request(raw_text)
+                    # attach structured survey + demographics so ModelClient can post the expected payload
+                    features["responses"] = parsed.responses.model_dump() if hasattr(parsed.responses, "model_dump") else parsed.responses.dict()
+                    features["demographics"] = parsed.demographics.model_dump() if hasattr(parsed.demographics, "model_dump") else parsed.demographics.dict()
+            except Exception as exc:  # pylint: disable=broad-except
+                logger.warning("Autism parser failed request_id=%s error=%s", request_id, exc)
 
         self._validate_payload(payload, features)
 
         selected_models = self.routing_engine.route(
-            report_type=payload.report_type,
+            report_type=extracted_report_type,
             features=features,
             symptoms=payload.symptoms,
             has_image=bool(payload.image),
@@ -66,16 +99,58 @@ class GatewayService:
             "AI gateway request_id=%s selected_models=%s report_type=%s",
             request_id,
             selected_models,
-            payload.report_type,
+            extracted_report_type,
         )
 
-        orchestration_result = await self.model_orchestrator.execute(
-            selected_models=selected_models,
-            features=features,
-            request_id=request_id,
-            symptoms=payload.symptoms,
-            image_base64=payload.image,
+        model_task = asyncio.create_task(
+            self.model_orchestrator.execute(
+                selected_models=selected_models,
+                features=features,
+                request_id=request_id,
+                symptoms=payload.symptoms,
+                image_base64=payload.image,
+            )
         )
+        rag_task = asyncio.create_task(
+            self._build_rag_context(
+                report_type=extracted_report_type,
+                features=features,
+                symptoms=payload.symptoms,
+                selected_models=selected_models,
+                request_id=request_id,
+            )
+        )
+        kg_task = asyncio.create_task(self._build_kg_context(selected_models, request_id=request_id))
+
+        model_outcome, rag_outcome, kg_outcome = await asyncio.gather(
+            model_task,
+            rag_task,
+            kg_task,
+            return_exceptions=True,
+        )
+
+        orchestration_result = model_outcome
+        if isinstance(orchestration_result, Exception):
+            logger.warning("Model orchestration failed request_id=%s error=%s", request_id, orchestration_result)
+            orchestration_result = await self.model_orchestrator.execute(
+                selected_models=selected_models,
+                features=features,
+                request_id=request_id,
+                symptoms=payload.symptoms,
+                image_base64=payload.image,
+            )
+
+        rag_context = []
+        if isinstance(rag_outcome, Exception):
+            logger.warning("RAG context unavailable request_id=%s error=%s", request_id, rag_outcome)
+        else:
+            rag_context = list(rag_outcome)
+
+        kg_context = KnowledgeGraphContext()
+        if isinstance(kg_outcome, Exception):
+            logger.warning("Knowledge graph context unavailable request_id=%s error=%s", request_id, kg_outcome)
+        else:
+            kg_context = kg_outcome
 
         overall_risk = aggregate_overall_risk(orchestration_result.results)
         priority = priority_from_risk(overall_risk)
@@ -93,14 +168,6 @@ class GatewayService:
 
         llm_explanation: LLMExplanationResponse | None = None
         if payload.include_explanation:
-            rag_context = await self._build_rag_context(
-                report_type=payload.report_type,
-                features=features,
-                symptoms=payload.symptoms,
-                selected_models=selected_models,
-                request_id=request_id,
-            )
-            kg_context = await self._build_kg_context(selected_models, request_id=request_id)
             try:
                 llm_payload = await self.llm_service.generate_explanation(
                     model_results=orchestration_result.results,
@@ -123,17 +190,26 @@ class GatewayService:
             list(orchestration_result.failures.keys()),
         )
 
-        return GatewayAnalyzeResponse(
-            success=True,
+        metadata = GatewayMetadata(
+            processing_time_ms=duration_ms,
+            timestamp=datetime.now(timezone.utc),
+        )
+
+        return self.response_aggregator.build_response(
+            request_id=request_id,
+            report_type=extracted_report_type,
+            features=features,
             selected_models=selected_models,
-            results=orchestration_result.results,
-            final_assessment=FinalAssessment(overall_risk=overall_risk, priority=priority),
-            reasoning=reasoning,
+            orchestration_result=orchestration_result,
+            rag_context=rag_context,
+            kg_context=kg_context,
             llm_explanation=llm_explanation,
-            metadata=GatewayMetadata(
-                processing_time_ms=duration_ms,
-                timestamp=datetime.now(timezone.utc),
-            ),
+            metadata=metadata,
+            reasoning=reasoning,
+            include_explanation=payload.include_explanation,
+            symptoms=list(payload.symptoms),
+            has_image=bool(payload.image),
+            has_raw_text=bool(raw_text),
         )
 
     async def _build_rag_context(
@@ -147,17 +223,18 @@ class GatewayService:
         rag_query = self._build_rag_query(report_type, features, symptoms, selected_models)
 
         try:
-            hits = await asyncio.to_thread(medical_rag_service.retrieve, rag_query, 3)
+            return await asyncio.to_thread(self.rag_client.retrieve_context, rag_query, 3)
+        except RAGClientError as exc:
+            logger.warning("RAG context unavailable request_id=%s error=%s", request_id, exc)
+            return []
         except MedicalRagServiceError as exc:
             logger.warning("RAG context unavailable request_id=%s error=%s", request_id, exc)
             return []
 
-        return [f"{hit.disease} | {hit.type} | {hit.text}" for hit in hits]
-
     async def _build_kg_context(self, selected_models: list[str], request_id: str) -> KnowledgeGraphContext:
         try:
-            return await asyncio.to_thread(knowledge_graph_service.get_context_for_models, selected_models)
-        except KnowledgeGraphServiceError as exc:
+            return await asyncio.to_thread(self.kg_client.get_context_for_models, selected_models)
+        except KGClientError as exc:
             logger.warning("Knowledge graph context unavailable request_id=%s error=%s", request_id, exc)
         except Exception as exc:  # pylint: disable=broad-except
             logger.warning("Knowledge graph context failed request_id=%s error=%s", request_id, exc)

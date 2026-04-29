@@ -31,6 +31,8 @@ class AutismDLPredictionResult(BaseModel):
 
 
 class Metadata(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     model_version: str
     processing_time_ms: int
     timestamp: datetime
@@ -45,6 +47,8 @@ class AutismDLResponse(BaseModel):
 
 
 class ImageInput(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     image: str = Field(..., description="Base64 encoded image string")
     image_format: Literal["png", "jpg", "jpeg"] = "png"
     model_version: str = "v1.0"
