@@ -152,6 +152,29 @@ class GatewayService:
         else:
             kg_context = kg_outcome
 
+        orchestration_result = model_outcome
+        if isinstance(orchestration_result, Exception):
+            logger.warning("Model orchestration failed request_id=%s error=%s", request_id, orchestration_result)
+            orchestration_result = await self.model_orchestrator.execute(
+                selected_models=selected_models,
+                features=features,
+                request_id=request_id,
+                symptoms=payload.symptoms,
+                image_base64=payload.image,
+            )
+
+        rag_context = []
+        if isinstance(rag_outcome, Exception):
+            logger.warning("RAG context unavailable request_id=%s error=%s", request_id, rag_outcome)
+        else:
+            rag_context = list(rag_outcome)
+
+        kg_context = KnowledgeGraphContext()
+        if isinstance(kg_outcome, Exception):
+            logger.warning("Knowledge graph context unavailable request_id=%s error=%s", request_id, kg_outcome)
+        else:
+            kg_context = kg_outcome
+
         overall_risk = aggregate_overall_risk(orchestration_result.results)
         priority = priority_from_risk(overall_risk)
 
