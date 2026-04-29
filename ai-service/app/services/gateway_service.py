@@ -71,13 +71,13 @@ class GatewayService:
             merged_features.update(features)
             features = merged_features
 
-            # If this looks like an autism screening, parse the questionnaire and add structured payload
             try:
-                if extracted_report_type == "autism" or re.search(r"\bA(?:[1-9]|10)[_\s:-]*Score\b", raw_text, re.IGNORECASE):
+                if self._looks_like_autism_screening(raw_text) or extracted_report_type == "autism":
                     parsed = parse_autism_prediction_request(raw_text)
                     # attach structured survey + demographics so ModelClient can post the expected payload
                     features["responses"] = parsed.responses.model_dump() if hasattr(parsed.responses, "model_dump") else parsed.responses.dict()
                     features["demographics"] = parsed.demographics.model_dump() if hasattr(parsed.demographics, "model_dump") else parsed.demographics.dict()
+                    extracted_report_type = "autism"
             except Exception as exc:  # pylint: disable=broad-except
                 logger.warning("Autism parser failed request_id=%s error=%s", request_id, exc)
 
@@ -284,6 +284,15 @@ class GatewayService:
 
         parts = [report_type, model_terms, symptom_terms, " ".join(feature_terms)]
         return " ".join(part for part in parts if part).strip() or "medical explanation"
+
+    def _looks_like_autism_screening(self, raw_text: str) -> bool:
+        text = raw_text.lower()
+        if any(keyword in text for keyword in {"m-chat", "autism spectrum", "autism screening", "screening responses"}):
+            return True
+
+        has_questionnaire_span = bool(re.search(r"\bA1\b.*\bA10\b", raw_text, re.IGNORECASE | re.DOTALL))
+        has_item_markers = len(re.findall(r"\bA(?:[1-9]|10)\b", raw_text, re.IGNORECASE)) >= 5
+        return has_questionnaire_span and has_item_markers
 
 
 def llm_reasoning(features: dict[str, Any], results: dict[str, dict[str, Any]]) -> None:

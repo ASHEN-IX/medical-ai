@@ -125,6 +125,10 @@ class AutismPredictionService:
     def _prepare_input_frame(self, payload: PredictionRequest) -> pd.DataFrame:
         responses = payload.responses
         demographics = payload.demographics
+
+        austim_value = demographics.austim if demographics.austim is not None else 0
+        used_before_value = demographics.used_app_before if demographics.used_app_before is not None else 0
+
         response_values = [
             responses.A1_Score,
             responses.A2_Score,
@@ -154,9 +158,9 @@ class AutismPredictionService:
             "gender": self._encode_category("gender", demographics.gender),
             "ethnicity": self._encode_category("ethnicity", demographics.ethnicity),
             "jaundice": self._encode_category("jaundice", demographics.jaundice),
-            "austim": self._encode_category("austim", demographics.austim or "no"),
+            "austim": self._encode_category("austim", austim_value),
             "contry_of_res": self._encode_category("contry_of_res", demographics.contry_of_res),
-            "used_app_before": self._encode_category("used_app_before", demographics.used_app_before or "no"),
+            "used_app_before": self._encode_category("used_app_before", used_before_value),
             "result": float(demographics.result) if demographics.result is not None else computed_result,
             "relation": self._encode_category("relation", demographics.relation),
         }

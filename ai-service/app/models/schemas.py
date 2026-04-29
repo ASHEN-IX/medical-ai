@@ -85,19 +85,19 @@ class SurveyResponses(BaseModel):
 class Demographics(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    gender: Literal["m", "f"]
+    gender: int | Literal["m", "f"]
     age: Optional[int] = Field(default=None, ge=0, le=120)
-    ethnicity: Optional[str] = None
-    jaundice: Optional[str] = None
-    relation: Optional[str] = None
+    ethnicity: Optional[str | int] = None
+    jaundice: Optional[str | int] = None
+    relation: Optional[str | int] = None
 
     # Optional fields from the training schema.
-    austim: Optional[str] = None
-    contry_of_res: Optional[str] = Field(
+    austim: Optional[str | int] = None
+    contry_of_res: Optional[str | int] = Field(
         default=None,
         validation_alias=AliasChoices("contry_of_res", "country_of_res"),
     )
-    used_app_before: Optional[str] = None
+    used_app_before: Optional[str | int] = None
     result: Optional[float] = None
 
 
