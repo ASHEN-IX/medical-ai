@@ -4,11 +4,9 @@ import asyncio
 import logging
 import time
 import re
-import re
 from datetime import datetime, timezone
 from typing import Any, Mapping
 
-from app.knowledge_graph.kg_schema import KnowledgeGraphContext
 from app.knowledge_graph.kg_schema import KnowledgeGraphContext
 from app.models.gateway_schema import (
     FinalAssessment,
@@ -192,8 +190,15 @@ class GatewayService:
             list(orchestration_result.failures.keys()),
         )
 
-        return GatewayAnalyzeResponse(
-            success=True,
+        metadata = GatewayMetadata(
+            processing_time_ms=duration_ms,
+            timestamp=datetime.now(timezone.utc),
+        )
+
+        return self.response_aggregator.build_response(
+            request_id=request_id,
+            report_type=extracted_report_type,
+            features=features,
             selected_models=selected_models,
             orchestration_result=orchestration_result,
             rag_context=rag_context,
@@ -222,14 +227,10 @@ class GatewayService:
         except RAGClientError as exc:
             logger.warning("RAG context unavailable request_id=%s error=%s", request_id, exc)
             return []
-<<<<<<< HEAD
-            hits = await asyncio.to_thread(medical_rag_service.retrieve, rag_query, 3)
-=======
             return await asyncio.to_thread(self.rag_client.retrieve_context, rag_query, 3)
         except RAGClientError as exc:
             logger.warning("RAG context unavailable request_id=%s error=%s", request_id, exc)
             return []
->>>>>>> d223790fad2d1269a97172fb2fad90d750636712
         except MedicalRagServiceError as exc:
             logger.warning("RAG context unavailable request_id=%s error=%s", request_id, exc)
             return []
