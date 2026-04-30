@@ -6,9 +6,14 @@ import logging
 import os
 from typing import Any, Mapping
 
-from groq import Groq
 from pydantic import ValidationError
 
+try:
+    from groq import Groq
+except ImportError:  # pragma: no cover - optional dependency for local fallback mode
+    Groq = None
+
+from app.knowledge_graph.kg_schema import KnowledgeGraphContext
 from app.models.llm_schema import LLMExplanationResponse
 from app.services.llm_guardrails import build_safe_fallback_response, ensure_safe_explanation
 from app.services.prompt_builder import build_explanation_messages
@@ -31,13 +36,19 @@ class LLMService:
         self.model_name = model_name or os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
         self.temperature = temperature
         api_key = os.getenv("GROQ_API_KEY")
-        self.client = client or Groq(api_key=api_key)
+        if client is not None:
+            self.client = client
+        elif Groq is None:
+            self.client = None
+        else:
+            self.client = Groq(api_key=api_key)
 
     async def generate_explanation(
         self,
         model_results: dict[str, Any],
         features: dict[str, Any],
         rag_context: list[str],
+        kg_context: KnowledgeGraphContext | None = None,
         request_id: str | None = None,
     ) -> dict[str, Any]:
         return await asyncio.to_thread(
@@ -45,6 +56,7 @@ class LLMService:
             model_results,
             features,
             rag_context,
+            kg_context,
             request_id,
         )
 
@@ -53,12 +65,16 @@ class LLMService:
         model_results: dict[str, Any],
         features: dict[str, Any],
         rag_context: list[str],
+        kg_context: KnowledgeGraphContext | None,
         request_id: str | None,
     ) -> dict[str, Any]:
         if not os.getenv("GROQ_API_KEY"):
             raise LLMServiceError("GROQ_API_KEY is not configured")
 
-        messages = build_explanation_messages(model_results, features, rag_context)
+        if self.client is None:
+            raise LLMServiceError("Groq client is not available in the current environment")
+
+        messages = build_explanation_messages(model_results, features, rag_context, kg_context)
         logger.info(
             "LLM explanation request started request_id=%s model=%s model_result_keys=%s feature_keys=%s rag_chunks=%s",
             request_id,

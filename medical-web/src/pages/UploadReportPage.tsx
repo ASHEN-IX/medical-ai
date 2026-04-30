@@ -5,9 +5,22 @@ import { useRouter } from "next/navigation";
 
 import FileUploader from "@/components/FileUploader";
 import { useAIAnalysis } from "@/hooks/useAIAnalysis";
-import type { AnalyzeReportPayload, ReportType } from "@/services/api";
+import { processReportFile, type AnalyzeReportPayload, type ProcessReportResponse, type ReportType } from "@/services/api";
 
-const REPORT_TYPES: ReportType[] = ["auto", "diabetes", "heart", "stroke", "mixed"];
+const REPORT_TYPES: ReportType[] = ["auto", "diabetes", "heart", "kidney", "stroke", "autism", "mixed"];
+
+function toAllowedReportType(value: string | null | undefined): ReportType {
+  if (!value) {
+    return "auto";
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (REPORT_TYPES.includes(normalized as ReportType)) {
+    return normalized as ReportType;
+  }
+
+  return "auto";
+}
 
 const FEATURE_FIELDS: Array<{ key: keyof AnalyzeReportPayload["features"] | string; label: string; placeholder: string }> = [
   { key: "glucose", label: "Glucose (mg/dL)", placeholder: "180" },
@@ -31,13 +44,14 @@ export default function UploadReportPage() {
   const [symptomsInput, setSymptomsInput] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
+  const [processedReport, setProcessedReport] = useState<ProcessReportResponse | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
   const updateFeature = (field: string, value: string) => {
     setFeatureValues((previous) => ({ ...previous, [field]: value }));
   };
 
-  const buildPayload = (): AnalyzeReportPayload | null => {
+  const buildPayload = async (): Promise<AnalyzeReportPayload | null> => {
     const features: Record<string, number> = {};
 
     for (const [key, rawValue] of Object.entries(featureValues)) {
@@ -59,14 +73,34 @@ export default function UploadReportPage() {
       .map((segment) => segment.trim())
       .filter(Boolean);
 
-    if (Object.keys(features).length === 0 && !imageBase64 && symptoms.length === 0) {
+    let reportExtraction: ProcessReportResponse | null = processedReport;
+    if (file && !reportExtraction) {
+      try {
+        reportExtraction = await processReportFile(file);
+        setProcessedReport(reportExtraction);
+      } catch (error) {
+        setFormError(error instanceof Error ? error.message : "Failed to process uploaded report.");
+        return null;
+      }
+    }
+
+    const mergedFeatures = {
+      ...(reportExtraction?.features || {}),
+      ...features,
+    };
+
+    if (Object.keys(mergedFeatures).length === 0 && !imageBase64 && symptoms.length === 0 && !reportExtraction?.raw_text) {
       setFormError("Provide at least one clinical feature, symptom, or image file to analyze.");
       return null;
     }
 
+    const effectiveReportType: ReportType =
+      reportType === "auto" ? toAllowedReportType(reportExtraction?.report_type) : reportType;
+
     return {
-      report_type: reportType,
-      features,
+      report_type: effectiveReportType,
+      features: mergedFeatures,
+      raw_text: reportExtraction?.raw_text,
       include_explanation: includeExplanation,
       symptoms,
       image: imageBase64 || undefined,
@@ -77,7 +111,7 @@ export default function UploadReportPage() {
     clearError();
     setFormError(null);
 
-    const payload = buildPayload();
+    const payload = await buildPayload();
     if (!payload) {
       return;
     }
@@ -114,14 +148,20 @@ export default function UploadReportPage() {
               onFileSelected={(nextFile, encodedImage) => {
                 setFile(nextFile);
                 setImageBase64(encodedImage);
+                setProcessedReport(null);
               }}
             />
           </div>
 
           {file && !imageBase64 ? (
             <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-              PDF uploads are supported for record tracking. Add at least one feature or symptom so the gateway can
-              perform structured analysis.
+              PDF uploads are automatically OCR-processed before gateway analysis.
+            </p>
+          ) : null}
+
+          {processedReport ? (
+            <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+              Report extracted ({processedReport.metadata.extraction_method}) with {Object.keys(processedReport.features).length} feature(s).
             </p>
           ) : null}
         </div>

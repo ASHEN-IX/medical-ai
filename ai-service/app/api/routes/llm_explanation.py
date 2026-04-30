@@ -28,6 +28,7 @@ async def explain_medical_results(payload: LLMExplainRequest, request: Request) 
             model_results=payload.model_results,
             features=payload.features,
             rag_context=payload.rag_context,
+            kg_context=payload.kg_context,
             request_id=request_id,
         )
         return LLMExplanationResponse.model_validate(result)
