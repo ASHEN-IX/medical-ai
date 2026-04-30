@@ -4,9 +4,11 @@ import asyncio
 import logging
 import time
 import re
+import re
 from datetime import datetime, timezone
 from typing import Any, Mapping
 
+from app.knowledge_graph.kg_schema import KnowledgeGraphContext
 from app.knowledge_graph.kg_schema import KnowledgeGraphContext
 from app.models.gateway_schema import (
     FinalAssessment,
@@ -16,11 +18,11 @@ from app.models.gateway_schema import (
 )
 from app.models.llm_schema import LLMExplanationResponse
 from app.services.analysis_aggregator import AnalysisResponseAggregator
-from app.services.autism_parser import parse_autism_prediction_request
 from app.services.kg_client import KGClient, KGClientError
 from app.services.llm_service import LLMService, LLMServiceError
-from app.services.medical_rag_service import MedicalRagServiceError, medical_rag_service
+from app.services.medical_rag_service import MedicalRagServiceError
 from app.services.nlp_service import NLPService
+from app.services.autism_parser import parse_autism_prediction_request
 from app.services.model_orchestrator import ModelOrchestrator
 from app.services.rag_client import RAGClient, RAGClientError
 from app.services.routing_engine import RoutingEngine
@@ -152,29 +154,6 @@ class GatewayService:
         else:
             kg_context = kg_outcome
 
-        orchestration_result = model_outcome
-        if isinstance(orchestration_result, Exception):
-            logger.warning("Model orchestration failed request_id=%s error=%s", request_id, orchestration_result)
-            orchestration_result = await self.model_orchestrator.execute(
-                selected_models=selected_models,
-                features=features,
-                request_id=request_id,
-                symptoms=payload.symptoms,
-                image_base64=payload.image,
-            )
-
-        rag_context = []
-        if isinstance(rag_outcome, Exception):
-            logger.warning("RAG context unavailable request_id=%s error=%s", request_id, rag_outcome)
-        else:
-            rag_context = list(rag_outcome)
-
-        kg_context = KnowledgeGraphContext()
-        if isinstance(kg_outcome, Exception):
-            logger.warning("Knowledge graph context unavailable request_id=%s error=%s", request_id, kg_outcome)
-        else:
-            kg_context = kg_outcome
-
         overall_risk = aggregate_overall_risk(orchestration_result.results)
         priority = priority_from_risk(overall_risk)
 
@@ -191,25 +170,12 @@ class GatewayService:
 
         llm_explanation: LLMExplanationResponse | None = None
         if payload.include_explanation:
-<<<<<<< HEAD
-            rag_context = await self._build_rag_context(
-                report_type=payload.report_type,
-                features=features,
-                symptoms=payload.symptoms,
-                selected_models=selected_models,
-                request_id=request_id,
-            )
-=======
->>>>>>> d223790fad2d1269a97172fb2fad90d750636712
             try:
                 llm_payload = await self.llm_service.generate_explanation(
                     model_results=orchestration_result.results,
                     features=features,
                     rag_context=rag_context,
-<<<<<<< HEAD
-=======
                     kg_context=kg_context,
->>>>>>> d223790fad2d1269a97172fb2fad90d750636712
                     request_id=request_id,
                 )
                 llm_explanation = LLMExplanationResponse.model_validate(llm_payload)
@@ -226,30 +192,8 @@ class GatewayService:
             list(orchestration_result.failures.keys()),
         )
 
-<<<<<<< HEAD
         return GatewayAnalyzeResponse(
             success=True,
-            selected_models=selected_models,
-            results=orchestration_result.results,
-            final_assessment=FinalAssessment(overall_risk=overall_risk, priority=priority),
-            reasoning=reasoning,
-            llm_explanation=llm_explanation,
-            metadata=GatewayMetadata(
-                processing_time_ms=duration_ms,
-                timestamp=datetime.now(timezone.utc),
-            ),
-        )
-
-=======
-        metadata = GatewayMetadata(
-            processing_time_ms=duration_ms,
-            timestamp=datetime.now(timezone.utc),
-        )
-
-        return self.response_aggregator.build_response(
-            request_id=request_id,
-            report_type=extracted_report_type,
-            features=features,
             selected_models=selected_models,
             orchestration_result=orchestration_result,
             rag_context=rag_context,
@@ -263,7 +207,6 @@ class GatewayService:
             has_raw_text=bool(raw_text),
         )
 
->>>>>>> d223790fad2d1269a97172fb2fad90d750636712
     async def _build_rag_context(
         self,
         report_type: str,
@@ -275,6 +218,10 @@ class GatewayService:
         rag_query = self._build_rag_query(report_type, features, symptoms, selected_models)
 
         try:
+            return await asyncio.to_thread(self.rag_client.retrieve_context, rag_query, 3)
+        except RAGClientError as exc:
+            logger.warning("RAG context unavailable request_id=%s error=%s", request_id, exc)
+            return []
 <<<<<<< HEAD
             hits = await asyncio.to_thread(medical_rag_service.retrieve, rag_query, 3)
 =======
@@ -287,9 +234,6 @@ class GatewayService:
             logger.warning("RAG context unavailable request_id=%s error=%s", request_id, exc)
             return []
 
-<<<<<<< HEAD
-        return [f"{hit.disease} | {hit.type} | {hit.text}" for hit in hits]
-=======
     async def _build_kg_context(self, selected_models: list[str], request_id: str) -> KnowledgeGraphContext:
         try:
             return await asyncio.to_thread(self.kg_client.get_context_for_models, selected_models)
@@ -299,7 +243,6 @@ class GatewayService:
             logger.warning("Knowledge graph context failed request_id=%s error=%s", request_id, exc)
 
         return KnowledgeGraphContext()
->>>>>>> d223790fad2d1269a97172fb2fad90d750636712
 
     def _validate_payload(self, payload: GatewayAnalyzeRequest, features: Mapping[str, Any]) -> None:
         if not features and not payload.image and not payload.symptoms:
@@ -345,8 +288,6 @@ class GatewayService:
         parts = [report_type, model_terms, symptom_terms, " ".join(feature_terms)]
         return " ".join(part for part in parts if part).strip() or "medical explanation"
 
-<<<<<<< HEAD
-=======
     def _looks_like_autism_screening(self, raw_text: str) -> bool:
         text = raw_text.lower()
         if any(keyword in text for keyword in {"m-chat", "autism spectrum", "autism screening", "screening responses"}):
@@ -356,7 +297,6 @@ class GatewayService:
         has_item_markers = len(re.findall(r"\bA(?:[1-9]|10)\b", raw_text, re.IGNORECASE)) >= 5
         return has_questionnaire_span and has_item_markers
 
->>>>>>> d223790fad2d1269a97172fb2fad90d750636712
 
 def llm_reasoning(features: dict[str, Any], results: dict[str, dict[str, Any]]) -> None:
     """Sprint 6 placeholder for LLM-powered explanation and clinical insight generation."""
