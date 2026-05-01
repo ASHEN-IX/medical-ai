@@ -42,6 +42,11 @@ async function bootstrap() {
     .addTag('users', 'User management endpoints')
     .addTag('reports', 'Medical reports endpoints')
     .addTag('predictions', 'AI predictions endpoints')
+    .addTag('analyses', 'Analysis results endpoints')
+    .addTag('ai', 'AI proxy and health timeline endpoints')
+    .addTag('doctor-requests', 'Patient-to-doctor request endpoints')
+    .addTag('doctor-reviews', 'Doctor review and feedback endpoints')
+    .addTag('messages', 'Doctor-patient messaging endpoints')
     .addTag('logs', 'System audit logs endpoints')
     .build();
 

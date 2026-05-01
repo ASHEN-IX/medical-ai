@@ -5,6 +5,7 @@
 services:
   # ===== FRONTEND =====
   frontend:
+    pull_policy: never
     build:
       context: ./medical-web
       dockerfile: Dockerfile.frontend
@@ -12,6 +13,7 @@ services:
     ports:
       - "3000:3000"
     environment:
+      - NEXT_PUBLIC_AI_GATEWAY_URL=http://localhost:8001
       - NEXT_PUBLIC_API_URL=http://localhost:4000
       - NEXT_PUBLIC_APP_NAME=MedAI Nexus
       - NODE_ENV=development
@@ -26,6 +28,7 @@ services:
 
   # ===== BACKEND =====
   backend:
+    pull_policy: never
     build:
       context: ./medical-api
       dockerfile: Dockerfile.backend
@@ -38,9 +41,9 @@ services:
       - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/medai_nexus}
       - JWT_SECRET=dev-secret-key-change-in-production
       - JWT_EXPIRATION=3600
-      - NEO4J_URL=bolt://neo4j:7687
-      - NEO4J_USERNAME=neo4j
-      - NEO4J_PASSWORD=neo4j_password
+      - NEO4J_URL=${NEO4J_URL:-bolt://neo4j:7687}
+      - NEO4J_USERNAME=${NEO4J_USERNAME:-neo4j}
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD:-neo4j_password}
       - AI_SERVICE_URL=http://ai-service:8001
       - AI_SERVICE_TIMEOUT_MS=120000
       - REDIS_URL=redis://redis:6379
@@ -61,6 +64,7 @@ services:
 
   # ===== AI SERVICE =====
   ai-service:
+    pull_policy: never
     build:
       context: ./ai-service
       dockerfile: Dockerfile.ai
@@ -71,11 +75,14 @@ services:
       - FASTAPI_ENV=development
       - FASTAPI_PORT=8001
       - FASTAPI_LOG_LEVEL=INFO
+      - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - GROQ_MODEL=${GROQ_MODEL:-openai/gpt-oss-120b}
       - SENTENCE_TRANSFORMERS_HOME=/data/sentence_transformers
       - OPENAI_API_KEY=${OPENAI_API_KEY:-sk-test-key}
-      - NEO4J_URL=bolt://neo4j:7687
-      - NEO4J_USERNAME=neo4j
-      - NEO4J_PASSWORD=neo4j_password
+      - NEO4J_URL=${NEO4J_URL:-bolt://neo4j:7687}
+      - NEO4J_USERNAME=${NEO4J_USERNAME:-neo4j}
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD:-neo4j_password}
       - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/medai_nexus}
       - FAISS_DATA_PATH=/data/faiss
       - MODELS_PATH=/models
@@ -118,9 +125,9 @@ services:
     image: neo4j:5.11-community
     container_name: medai-neo4j
     environment:
-      - NEO4J_AUTH=neo4j/neo4j_password
-      - NEO4J_dbms_memory_heap_max__size=2G
-      - NEO4J_server_default__advertised__address=neo4j
+      - NEO4J_AUTH=${NEO4J_USERNAME:-neo4j}/${NEO4J_PASSWORD:-neo4j_password}
+      - NEO4J_server_memory_heap_max__size=2G
+      - NEO4J_server_default__advertised__address=localhost
     ports:
       - "7474:7474"  # Web UI
       - "7687:7687"  # Bolt Protocol

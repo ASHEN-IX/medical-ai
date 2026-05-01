@@ -1,13 +1,20 @@
 from __future__ import annotations
 
 import logging
+import importlib
 import os
 import pickle
 import threading
+import sys
 from pathlib import Path
 from typing import Any, Optional
 
 from app.models.schemas import ModelHealth
+
+try:
+    import numpy as _numpy
+except Exception:  # pragma: no cover - runtime dependency handling
+    _numpy = None
 
 try:
     import tensorflow as tf
@@ -95,6 +102,7 @@ class ModelLoader:
         }
 
     def _load_pickle_like(self, path: Path) -> Any:
+        self._register_numpy_compatibility()
         try:
             import joblib
 
@@ -102,6 +110,26 @@ class ModelLoader:
         except Exception:
             with path.open("rb") as file:
                 return pickle.load(file)
+
+    def _register_numpy_compatibility(self) -> None:
+        if _numpy is None:
+            return
+
+        # Legacy pickles may reference the old/alternate numpy internal module paths.
+        # Register aliases so unpickling can resolve the expected imports.
+        core_pkg = importlib.import_module("numpy.core")
+        setattr(_numpy, "_core", core_pkg)
+
+        numpy_aliases = {
+            "numpy._core": core_pkg,
+            "numpy._core.multiarray": importlib.import_module("numpy.core.multiarray"),
+            "numpy._core.numeric": importlib.import_module("numpy.core.numeric"),
+            "numpy._core.umath": importlib.import_module("numpy.core.umath"),
+            "numpy._core._multiarray_umath": importlib.import_module("numpy.core._multiarray_umath"),
+        }
+
+        for module_name, module_obj in numpy_aliases.items():
+            sys.modules[module_name] = module_obj
 
     def _resolve_existing_path(self, candidates: list[Path]) -> Optional[Path]:
         for path in candidates:
@@ -335,8 +363,7 @@ class ModelLoader:
             return
 
         try:
-            with model_path.open("rb") as file:
-                self.autism_prediction_model = pickle.load(file)
+            self.autism_prediction_model = self._load_pickle_like(model_path)
             self.feature_columns = list(
                 getattr(self.autism_prediction_model, "feature_names_in_", DEFAULT_FEATURE_COLUMNS)
             )
@@ -369,8 +396,7 @@ class ModelLoader:
             return
 
         try:
-            with encoders_path.open("rb") as file:
-                encoders = pickle.load(file)
+            encoders = self._load_pickle_like(encoders_path)
             if isinstance(encoders, dict):
                 self.prediction_encoders = encoders
             else:

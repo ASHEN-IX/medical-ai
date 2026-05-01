@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -8,6 +9,7 @@ from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.routes.autism_dl import router as autism_dl_router
@@ -17,6 +19,9 @@ from app.api.routes.diabetes import router as diabetes_router
 from app.api.routes.kidney_disease import router as kidney_disease_router
 from app.api.routes.rag import router as rag_router
 from app.api.routes.report_processing import router as report_processing_router
+from app.api.routes.manual_run import router as manual_run_router
+from app.api.routes.chat import router as chat_router
+from app.knowledge_graph.kg_service import KnowledgeGraphServiceError, knowledge_graph_service
 from app.models.schemas import ErrorDetail, ErrorResponse, HealthResponse
 from app.services.medical_rag_service import MedicalRagServiceError, medical_rag_service
 from app.services.model_loader import model_loader
@@ -37,6 +42,10 @@ async def lifespan(_: FastAPI):
         medical_rag_service.initialize()
     except MedicalRagServiceError as exc:
         logger.warning("Medical RAG initialization skipped at startup: %s", exc)
+    try:
+        knowledge_graph_service.bootstrap()
+    except KnowledgeGraphServiceError as exc:
+        logger.warning("Knowledge graph bootstrap skipped at startup: %s", exc)
     logger.info(
         "Model startup loading finished | autism_dl=%s autism_pred=%s diabetes=%s",
         "loaded" if model_loader.autism_dl_model is not None else "not_loaded",
@@ -53,6 +62,20 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
+)
+
+
+def _parse_cors_origins() -> list[str]:
+    raw_value = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
+    return [origin.strip() for origin in raw_value.split(",") if origin.strip()]
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_parse_cors_origins(),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -152,5 +175,8 @@ app.include_router(autism_prediction_router, prefix="/api/v1")
 app.include_router(diabetes_router, prefix="/api/v1")
 app.include_router(ai_gateway_router, prefix="/api/v1")
 app.include_router(kidney_disease_router, prefix="/api/v1")
+app.include_router(llm_explanation_router, prefix="/api/v1")
 app.include_router(rag_router, prefix="/api/v1")
 app.include_router(report_processing_router, prefix="/api/v1")
+app.include_router(manual_run_router, prefix="/api/v1")
+app.include_router(chat_router, prefix="/api/v1")

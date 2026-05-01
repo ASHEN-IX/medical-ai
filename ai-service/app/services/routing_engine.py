@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 from typing import Any, Mapping, Sequence
 
+from app.utils.medical_patterns import KIDNEY_MARKER_KEYWORDS
+
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +32,12 @@ class RoutingEngine:
         normalized_report_type = str(report_type or "auto").strip().lower()
 
         # Explicit report type has priority over auto-detection rules.
-        if normalized_report_type in {"diabetes", "heart", "stroke"}:
+        if normalized_report_type in {"diabetes", "heart", "kidney", "stroke"}:
             selected_models.add(normalized_report_type)
+
+        # Autism survey style reports: detect by report_type or presence of A1..A10 answers
+        if normalized_report_type == "autism":
+            selected_models.add("autism_pred")
 
         if normalized_report_type in {"auto", "mixed"}:
             glucose = _to_float(features.get("glucose"))
@@ -46,14 +52,23 @@ class RoutingEngine:
             ):
                 selected_models.add("heart")
 
+            if self._has_kidney_indicators(features, symptoms):
+                selected_models.add("kidney")
+
             if self._has_stroke_indicators(features, symptoms):
                 selected_models.add("stroke")
 
         if has_image:
             selected_models.add("autism_dl")
 
+        # If the features contain autism questionnaire answers, route to autism_pred
+        if any(key.strip().lower().startswith("a") and key.strip().lower().endswith("_score") for key in features.keys()):
+            selected_models.add("autism_pred")
+        if isinstance(features.get("responses"), dict):
+            selected_models.add("autism_pred")
+
         if normalized_report_type == "mixed" and not selected_models:
-            selected_models.update({"diabetes", "heart", "stroke"})
+            selected_models.update({"diabetes", "heart", "kidney", "stroke"})
 
         ordered_models = sorted(selected_models, key=self._sort_order)
         return ordered_models
@@ -98,10 +113,48 @@ class RoutingEngine:
         model_priority = {
             "diabetes": 1,
             "heart": 2,
-            "stroke": 3,
-            "autism_dl": 4,
+            "kidney": 3,
+            "stroke": 4,
+            "autism_dl": 5,
         }
         return model_priority.get(model_name, 100)
+
+    def _has_kidney_indicators(self, features: Mapping[str, Any], symptoms: Sequence[str] | None) -> bool:
+        candidates: list[str] = []
+
+        if symptoms:
+            candidates.extend([str(symptom).strip().lower() for symptom in symptoms])
+
+        for key, value in features.items():
+            key_text = str(key).strip().lower()
+            if any(marker in key_text for marker in KIDNEY_MARKER_KEYWORDS):
+                return True
+
+            if isinstance(value, str):
+                candidates.append(value.strip().lower())
+
+        kidney_keywords = {
+            "creatinine",
+            "egfr",
+            "gfr",
+            "bun",
+            "urea",
+            "albuminuria",
+            "proteinuria",
+            "ckd",
+            "kidney",
+            "renal",
+            "swelling",
+            "edema",
+            "fatigue",
+            "nausea",
+            "vomiting",
+            "urination",
+            "urine",
+            "itching",
+            "cramps",
+        }
+        return any(any(keyword in candidate for keyword in kidney_keywords) for candidate in candidates)
 
 
 def _to_float(value: Any) -> float | None:

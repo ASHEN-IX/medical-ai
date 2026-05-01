@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.6
 # AI Service Dockerfile
 FROM python:3.11-slim
 
@@ -15,9 +16,10 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 
 # Install Python dependencies
-RUN python -m pip install --upgrade pip setuptools wheel && \
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python -m pip install --upgrade pip setuptools wheel && \
     for attempt in 1 2 3; do \
-      pip install --no-cache-dir --prefer-binary --retries 10 --timeout 120 -r requirements.txt && break; \
+      pip install --prefer-binary --retries 10 --timeout 120 -r requirements.txt && break; \
       echo "pip install failed (attempt ${attempt}/3). Retrying..."; \
       if [ "${attempt}" = "3" ]; then exit 1; fi; \
     done
@@ -33,7 +35,7 @@ EXPOSE 8001
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD python -c "import requests; requests.get('http://localhost:8001/api/v1/health', timeout=2)" || exit 1
+  CMD python -c "from urllib.request import urlopen; urlopen('http://localhost:8001/api/v1/health', timeout=2).read()" || exit 1
 
 # Start application
 CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]
