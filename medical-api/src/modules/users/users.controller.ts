@@ -6,6 +6,7 @@ import {
   Body,
   UseGuards,
   Request,
+  ForbiddenException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
@@ -29,6 +30,14 @@ export class UsersController {
     return this.usersService.getMe(req.user.id);
   }
 
+  @Get('doctors')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth('JWT')
+  @ApiOperation({ summary: 'Get list of available doctors' })
+  async getDoctors() {
+    return this.usersService.getDoctors();
+  }
+
   @Get(':id')
   @UseGuards(AuthGuard('jwt'), RoleGuard)
   @Roles(UserRole.DOCTOR, UserRole.ADMIN)
@@ -50,19 +59,17 @@ export class UsersController {
     @Body() updateUserDto: UpdateUserDto,
     @Request() req: any,
   ) {
-    // Users can only update their own profile
     if (req.user.id !== id && req.user.role !== UserRole.ADMIN) {
-      throw new Error('Forbidden');
+      throw new ForbiddenException('You can only update your own profile');
     }
-
     return this.usersService.updateUser(id, updateUserDto);
   }
 
   @Get()
   @UseGuards(AuthGuard('jwt'), RoleGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.DOCTOR, UserRole.ADMIN)
   @ApiBearerAuth('JWT')
-  @ApiOperation({ summary: 'Get all users (Admin only)' })
+  @ApiOperation({ summary: 'Get all users (Doctor/Admin only)' })
   @ApiResponse({ status: 200, description: 'Users list' })
   async getAllUsers(@Request() req: any) {
     return this.usersService.getAllUsers(req.user.role);

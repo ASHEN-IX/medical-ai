@@ -4,15 +4,20 @@ const bcrypt = require('bcryptjs');
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Seeding database...');
+  console.log('Seeding database...');
 
-  // Clear existing data (use with caution in development only)
+  // Clear in reverse dependency order
+  await prisma.message.deleteMany({});
+  await prisma.doctorReview.deleteMany({});
+  await prisma.doctorRequest.deleteMany({});
+  await prisma.healthMetric.deleteMany({});
   await prisma.log.deleteMany({});
   await prisma.prediction.deleteMany({});
+  await prisma.analysis.deleteMany({});
   await prisma.medicalReport.deleteMany({});
+  await prisma.doctorProfile.deleteMany({});
   await prisma.user.deleteMany({});
 
-  // Create test users
   const adminPassword = await bcrypt.hash('admin123', 10);
   const doctorPassword = await bcrypt.hash('doctor123', 10);
   const patientPassword = await bcrypt.hash('patient123', 10);
@@ -28,10 +33,43 @@ async function main() {
 
   const doctor = await prisma.user.create({
     data: {
-      name: 'Dr. John Smith',
+      name: 'Dr. Sarah Chen',
       email: 'doctor@medai.local',
       password: doctorPassword,
       role: 'DOCTOR',
+      age: 38,
+      gender: 'FEMALE',
+    },
+  });
+
+  await prisma.doctorProfile.create({
+    data: {
+      userId: doctor.id,
+      specialty: 'Internal Medicine',
+      licenseNo: 'MD-2024-001',
+      verified: true,
+      bio: 'Board-certified internist with 12 years of experience in diagnostic medicine.',
+    },
+  });
+
+  const doctor2 = await prisma.user.create({
+    data: {
+      name: 'Dr. Michael Park',
+      email: 'doctor2@medai.local',
+      password: doctorPassword,
+      role: 'DOCTOR',
+      age: 45,
+      gender: 'MALE',
+    },
+  });
+
+  await prisma.doctorProfile.create({
+    data: {
+      userId: doctor2.id,
+      specialty: 'Cardiology',
+      licenseNo: 'MD-2024-002',
+      verified: true,
+      bio: 'Cardiologist specializing in preventive heart disease management.',
     },
   });
 
@@ -41,39 +79,133 @@ async function main() {
       email: 'patient@medai.local',
       password: patientPassword,
       role: 'PATIENT',
+      age: 34,
+      gender: 'FEMALE',
+      medicalBackground: 'Family history of diabetes. No known allergies.',
     },
   });
 
-  // Create test medical report
-  const report = await prisma.medicalReport.create({
+  const patient2 = await prisma.user.create({
+    data: {
+      name: 'Alex Johnson',
+      email: 'patient2@medai.local',
+      password: patientPassword,
+      role: 'PATIENT',
+      age: 52,
+      gender: 'MALE',
+      medicalBackground: 'Hypertension, managed with medication since 2019.',
+    },
+  });
+
+  // Create sample analyses
+  const analysis1 = await prisma.analysis.create({
     data: {
       userId: patient.id,
-      fileUrl: 's3://medai-nexus-reports/patient-report-001.pdf',
-      fileName: 'Chest X-Ray Report',
-      extractedData: {
-        reportType: 'Chest X-Ray',
-        date: '2024-04-17',
-        findings: 'Normal',
+      testName: 'diabetes',
+      selectedModels: ['diabetes', 'heart'],
+      features: { glucose: 180, blood_pressure: 140, cholesterol: 220, age: 34 },
+      symptoms: ['fatigue', 'blurred vision'],
+      results: {
+        diabetes: { risk: 'HIGH', confidence: 0.87 },
+        heart: { risk: 'MEDIUM', confidence: 0.62 },
       },
+      healthScore: 55,
+      riskLevel: 'HIGH',
+      keyFindings: [
+        'High risk detected by diabetes model (87% confidence)',
+        'Elevated glucose levels at 180 mg/dL',
+        'Blood pressure above normal range',
+      ],
+      aiInsights: 'Based on your glucose level of 180 mg/dL and reported symptoms of fatigue and blurred vision, there is an elevated risk of diabetes. Your blood pressure of 140 mmHg also suggests cardiovascular monitoring is advisable.',
+      status: 'COMPLETED',
     },
   });
 
-  // Create test prediction
-  const prediction = await prisma.prediction.create({
+  const analysis2 = await prisma.analysis.create({
     data: {
-      reportId: report.id,
-      userId: doctor.id,
-      disease: 'Normal',
-      confidence: 0.98,
-      explanation: 'No abnormalities detected in chest X-ray',
-      metadata: {
-        modelVersion: '1.0.0',
-        processingTime: '2.5s',
+      userId: patient2.id,
+      testName: 'heart',
+      selectedModels: ['heart', 'stroke', 'kidney'],
+      features: { blood_pressure: 165, cholesterol: 280, age: 52 },
+      symptoms: ['chest pain', 'shortness of breath'],
+      results: {
+        heart: { risk: 'HIGH', confidence: 0.91 },
+        stroke: { risk: 'MEDIUM', confidence: 0.58 },
+        kidney: { risk: 'LOW', confidence: 0.22 },
       },
+      healthScore: 38,
+      riskLevel: 'HIGH',
+      keyFindings: [
+        'High cardiovascular risk detected (91% confidence)',
+        'Severely elevated cholesterol at 280 mg/dL',
+        'Hypertensive blood pressure at 165 mmHg',
+      ],
+      aiInsights: 'Critical cardiovascular indicators detected. Cholesterol at 280 mg/dL and blood pressure at 165 mmHg significantly increase risk of heart disease. Immediate medical consultation recommended.',
+      status: 'COMPLETED',
     },
   });
 
-  // Create test logs
+  // Create health metrics for timeline
+  const metricData = [
+    { userId: patient.id, metricKey: 'glucose', value: 160, source: 'analysis' },
+    { userId: patient.id, metricKey: 'glucose', value: 175, source: 'analysis' },
+    { userId: patient.id, metricKey: 'glucose', value: 180, source: 'analysis' },
+    { userId: patient.id, metricKey: 'cholesterol', value: 200, source: 'analysis' },
+    { userId: patient.id, metricKey: 'cholesterol', value: 220, source: 'analysis' },
+    { userId: patient.id, metricKey: 'blood_pressure', value: 130, source: 'analysis' },
+    { userId: patient.id, metricKey: 'blood_pressure', value: 140, source: 'analysis' },
+  ];
+
+  for (const m of metricData) {
+    await prisma.healthMetric.create({ data: m });
+  }
+
+  // Create a doctor request (auto-generated due to HIGH risk)
+  await prisma.doctorRequest.create({
+    data: {
+      patientId: patient2.id,
+      doctorId: doctor.id,
+      analysisId: analysis2.id,
+      urgency: 'URGENT',
+      status: 'ASSIGNED',
+      notes: 'Auto-generated: HIGH risk detected by AI system',
+    },
+  });
+
+  // Create a sample doctor review
+  await prisma.doctorReview.create({
+    data: {
+      doctorId: doctor.id,
+      analysisId: analysis1.id,
+      diagnosis: 'Pre-diabetic condition with insulin resistance indicators',
+      notes: 'Patient shows classic pre-diabetic markers. Recommend lifestyle intervention before medication.',
+      recommendations: [
+        'Reduce refined sugar intake',
+        'Exercise 30 min daily',
+        'Follow-up fasting glucose test in 3 months',
+        'Consider HbA1c test',
+      ],
+      aiApproved: true,
+    },
+  });
+
+  // Update analysis status to REVIEWED
+  await prisma.analysis.update({
+    where: { id: analysis1.id },
+    data: { status: 'REVIEWED' },
+  });
+
+  // Create sample messages
+  await prisma.message.create({
+    data: {
+      senderId: doctor.id,
+      receiverId: patient.id,
+      content: 'Hello Jane, I reviewed your recent analysis. Your glucose levels are concerning but manageable with lifestyle changes. Let me know if you have questions.',
+      read: false,
+    },
+  });
+
+  // Logs
   await prisma.log.create({
     data: {
       userId: admin.id,
@@ -82,11 +214,13 @@ async function main() {
     },
   });
 
-  console.log('✅ Seeding completed successfully!');
-  console.log('📝 Test Users:');
-  console.log(`  Admin: admin@medai.local / admin123`);
-  console.log(`  Doctor: doctor@medai.local / doctor123`);
-  console.log(`  Patient: patient@medai.local / patient123`);
+  console.log('Seeding completed successfully!');
+  console.log('Test Users:');
+  console.log('  Admin: admin@medai.local / admin123');
+  console.log('  Doctor: doctor@medai.local / doctor123');
+  console.log('  Doctor 2: doctor2@medai.local / doctor123');
+  console.log('  Patient: patient@medai.local / patient123');
+  console.log('  Patient 2: patient2@medai.local / patient123');
 }
 
 main()
@@ -94,7 +228,7 @@ main()
     await prisma.$disconnect();
   })
   .catch(async (e) => {
-    console.error('❌ Seeding error:', e);
+    console.error('Seeding error:', e);
     await prisma.$disconnect();
     process.exit(1);
   });
