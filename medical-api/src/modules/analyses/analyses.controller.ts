@@ -6,6 +6,7 @@ import {
   Delete,
   Param,
   Body,
+  Query,
   UseGuards,
   Request,
   HttpCode,
@@ -24,6 +25,25 @@ import { RoleGuard } from '../../common/guards/role.guard';
 @UseGuards(AuthGuard('jwt'))
 export class AnalysesController {
   constructor(private readonly analysesService: AnalysesService) {}
+
+  @Get('doctor/all')
+  @UseGuards(AuthGuard('jwt'), RoleGuard)
+  @Roles(UserRole.DOCTOR, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Get all analyses across all users (doctor only)' })
+  async getAllAnalysesForDoctor(
+    @Request() req: any,
+    @Query('search') search?: string,
+    @Query('riskLevel') riskLevel?: string,
+    @Query('status') status?: string,
+    @Query('patientId') patientId?: string,
+  ) {
+    return this.analysesService.getAllAnalysesForDoctor(req.user.role, {
+      search,
+      riskLevel,
+      status,
+      patientId,
+    });
+  }
 
   @Get('doctor/user/:userId')
   @UseGuards(AuthGuard('jwt'), RoleGuard)
@@ -48,6 +68,13 @@ export class AnalysesController {
       features: Record<string, number>;
       symptoms: string[];
       results: Record<string, { risk: string; confidence: number }>;
+      healthScore?: number;
+      riskLevel?: string;
+      keyFindings?: string[];
+      aiInsights?: string;
+      status?: string;
+      request?: Record<string, unknown>;
+      response?: Record<string, unknown>;
     },
   ) {
     return this.analysesService.createAnalysis(req.user.id, body);
@@ -74,6 +101,14 @@ export class AnalysesController {
     body: Partial<{
       testName: string;
       results: Record<string, { risk: string; confidence: number }>;
+      healthScore: number;
+      riskLevel: string;
+      keyFindings: string[];
+      aiInsights: string;
+      status: string;
+      followUpAnswers: Record<string, string>;
+      request: Record<string, unknown>;
+      response: Record<string, unknown>;
     }>,
   ) {
     return this.analysesService.updateAnalysis(
