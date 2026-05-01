@@ -154,6 +154,55 @@ class KidneyDiseaseResponse(BaseModel):
     request_id: str
 
 
+class DiabetesRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    pregnancies: int = Field(..., ge=0, le=20, validation_alias=AliasChoices("pregnancies", "Pregnancies"))
+    glucose: float = Field(..., ge=0, le=250, validation_alias=AliasChoices("glucose", "Glucose"))
+    blood_pressure: float = Field(
+        ...,
+        ge=0,
+        le=140,
+        validation_alias=AliasChoices("blood_pressure", "BloodPressure"),
+    )
+    skin_thickness: float = Field(
+        ...,
+        ge=0,
+        le=100,
+        validation_alias=AliasChoices("skin_thickness", "SkinThickness"),
+    )
+    insulin: float = Field(..., ge=0, le=900, validation_alias=AliasChoices("insulin", "Insulin"))
+    bmi: float = Field(..., ge=0, le=70, validation_alias=AliasChoices("bmi", "BMI"))
+    diabetes_pedigree_function: float = Field(
+        ...,
+        ge=0,
+        le=3,
+        validation_alias=AliasChoices("diabetes_pedigree_function", "DiabetesPedigreeFunction"),
+    )
+    age: int = Field(..., ge=1, le=120, validation_alias=AliasChoices("age", "Age"))
+
+
+class DiabetesClassProbabilities(BaseModel):
+    diabetic: float
+    non_diabetic: float
+
+
+class DiabetesPredictionResult(BaseModel):
+    diabetic: bool
+    risk_level: Literal["LOW", "MEDIUM", "HIGH"]
+    confidence_score: float
+    diabetes_probability: float
+    class_probabilities: DiabetesClassProbabilities
+
+
+class DiabetesResponse(BaseModel):
+    success: bool = True
+    prediction: DiabetesPredictionResult
+    recommendations: List[str]
+    metadata: Metadata
+    request_id: str
+
+
 class CategoryOption(BaseModel):
     code: int
     label: str

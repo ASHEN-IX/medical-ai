@@ -1,7 +1,7 @@
 # MedAI Nexus - Production-Grade AI Healthcare Platform
 
-**Status:** Sprint 0 - Architecture Design  
-**Date:** April 17, 2026  
+**Status:** Integrated local AI prototype  
+**Date:** May 1, 2026  
 **Team:** 4 parallel developers (Frontend, Backend, AI, Data)
 
 ## 🎯 Project Vision
@@ -10,9 +10,67 @@ MedAI Nexus is an enterprise-grade AI-powered medical analysis platform that:
 
 - 📄 **Accepts** medical reports, imaging, and lab results
 - 🤖 **Processes** documents through intelligent ML pipelines
-- 🧠 **Analyzes** using trained models + LLM intelligence
+- 🧠 **Analyzes** using trained disease detection models + AI Gateway routing
 - 📊 **Provides** diagnostic insights with confidence metrics
 - 📈 **Recommends** treatments backed by clinical evidence
+
+## Integrated AI Models
+
+The current AI service includes these disease detection integrations:
+
+- **Diabetes detection** using a scikit-learn Decision Tree model trained in the diabetes notebook/Gradio workflow.
+- **Autism survey prediction** using the existing tabular autism model.
+- **Autism image/DL detection** route support is present, but the `.h5` model file must exist before it can load.
+- **Kidney disease prediction** using the existing kidney model artifacts.
+
+### Diabetes Integration
+
+The diabetes model is stored at:
+
+```text
+ai-service/models/diabetes/diabetes_decision_tree.joblib
+```
+
+It is exposed through:
+
+```text
+POST /api/v1/diabetes/predict
+POST /api/v1/ai/analyze
+```
+
+The frontend diabetes intake uses the same 8 fields as the original Gradio notebook:
+
+```text
+Pregnancies
+Glucose
+BloodPressure
+SkinThickness
+Insulin
+BMI
+DiabetesPedigreeFunction
+Age
+```
+
+### Autism Integration
+
+The autism backend routes are:
+
+```text
+POST /api/v1/autism-pred/predict
+GET  /api/v1/autism-pred/categories
+POST /api/v1/autism-dl/predict
+```
+
+The autism model artifacts are expected under:
+
+```text
+ai-service/models/autism-prediction/best-model-autism.pkl
+ai-service/models/autism-prediction/encoders.pkl
+ai-service/models/autism-dl/autism-dl.h5
+ai-service/models/autism-dl/final_model.h5
+```
+
+If the autism DL `.h5` file is missing, the health endpoint reports the service as `degraded`, but diabetes and other loaded models can still run.
 
 ## 🏗️ System Architecture
 
@@ -81,7 +139,7 @@ medical-ai/
 - Python 3.10+ (for local AI development)
 - Git
 
-### Start Local Environment
+### Start Local Environment With Docker
 ```bash
 # Clone the repository
 git clone <repo-url>
@@ -104,6 +162,30 @@ docker-compose logs -f
 - Neo4j Browser: http://localhost:7474
 - PostgreSQL: localhost:5432
 
+### Start Current Local Frontend + AI Service
+
+For the current local diabetes integration, the verified development setup is:
+
+```powershell
+# Terminal 1 - AI service
+cd "D:\Education\Esprit\4 IoSyS\2éme Semester\Machine Learning__4IoSyS1\1. Projet\medical-ai\ai-service"
+$env:PYTHONPATH="D:\Education\Esprit\4 IoSyS\2éme Semester\Machine Learning__4IoSyS1\1. Projet\medical-ai\ai-service"
+& "..\..\Data Preparation - Copie\.venv\Scripts\python.exe" -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+
+# Terminal 2 - Frontend
+cd "D:\Education\Esprit\4 IoSyS\2éme Semester\Machine Learning__4IoSyS1\1. Projet\medical-ai\medical-web"
+npm install
+npm run dev
+```
+
+Local URLs:
+
+- Frontend: http://localhost:3000
+- Diabetes intake page: http://localhost:3000/upload
+- AI service health: http://localhost:8000/api/v1/health
+- Diabetes API: http://localhost:8000/api/v1/diabetes/predict
+- AI Gateway: http://localhost:8000/api/v1/ai/analyze
+
 **[Full setup guide: DEVELOPMENT.md](./DEVELOPMENT.md)**
 
 ## 📋 Tech Stack
@@ -125,6 +207,7 @@ docker-compose logs -f
 ### AI Intelligence
 - **Server:** Python FastAPI
 - **ML Frameworks:** PyTorch, scikit-learn
+- **Integrated models:** Diabetes Decision Tree, autism survey model, autism DL route, kidney disease model
 - **LLM:** LangChain + OpenAI/LLaMA
 - **RAG:** FAISS / Chroma
 - **Graph DB:** Neo4j
@@ -149,7 +232,7 @@ docker-compose logs -f
 - File upload & report management
 - AI pipeline foundation
 
-### Phase 3: AI Intelligence (Weeks 9-14)
+### ✅ Phase 3: AI Intelligence (Weeks 9-14)
 - ML model integration
 - RAG system
 - LLM orchestration
@@ -225,6 +308,46 @@ See [DEVELOPMENT.md](./DEVELOPMENT.md#troubleshooting) for setup issues.
 ## 📝 License
 
 Internal use only - Healthcare proprietary.
+
+## Git Workflow For Pull, Conflict Fix, And Push
+
+Use this workflow before pushing your diabetes integration:
+
+```bash
+git status
+git add README.md ai-service/README.md ai-service/app ai-service/models/diabetes medical-web/src/pages/UploadReportPage.tsx medical-web/package-lock.json medical-web/package.json
+git commit -m "Integrate diabetes detection model"
+git pull origin main --rebase
+```
+
+If Git reports conflicts:
+
+```bash
+git status
+```
+
+Open each conflicted file, remove conflict markers like:
+
+```text
+<<<<<<< HEAD
+=======
+>>>>>>> branch-name
+```
+
+Then continue:
+
+```bash
+git add <fixed-file>
+git rebase --continue
+```
+
+After the rebase finishes:
+
+```bash
+git push origin main
+```
+
+If this is your first time pushing and Git asks for authentication, sign in with your GitHub account or use a GitHub personal access token.
 
 ## 🚦 Deployment
 

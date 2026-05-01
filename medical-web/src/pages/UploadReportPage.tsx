@@ -9,23 +9,36 @@ import type { AnalyzeReportPayload, ReportType } from "@/services/api";
 
 const REPORT_TYPES: ReportType[] = ["auto", "diabetes", "heart", "stroke", "mixed"];
 
-const FEATURE_FIELDS: Array<{ key: keyof AnalyzeReportPayload["features"] | string; label: string; placeholder: string }> = [
-  { key: "glucose", label: "Glucose (mg/dL)", placeholder: "180" },
-  { key: "blood_pressure", label: "Blood Pressure (systolic)", placeholder: "140" },
-  { key: "cholesterol", label: "Cholesterol (mg/dL)", placeholder: "220" },
-  { key: "age", label: "Age", placeholder: "45" },
+const FEATURE_FIELDS: Array<{
+  key: keyof AnalyzeReportPayload["features"] | string;
+  label: string;
+  placeholder: string;
+  step?: string;
+}> = [
+  { key: "pregnancies", label: "Pregnancies", placeholder: "2" },
+  { key: "glucose", label: "Glucose", placeholder: "148" },
+  { key: "blood_pressure", label: "Blood Pressure", placeholder: "72" },
+  { key: "skin_thickness", label: "Skin Thickness", placeholder: "35" },
+  { key: "insulin", label: "Insulin", placeholder: "0" },
+  { key: "bmi", label: "BMI", placeholder: "33.6", step: "0.1" },
+  { key: "diabetes_pedigree_function", label: "Diabetes Pedigree Function", placeholder: "0.63", step: "0.01" },
+  { key: "age", label: "Age", placeholder: "50" },
 ];
 
 export default function UploadReportPage() {
   const router = useRouter();
   const { analyze, loading, error, clearError } = useAIAnalysis();
 
-  const [reportType, setReportType] = useState<ReportType>("auto");
+  const [reportType, setReportType] = useState<ReportType>("diabetes");
   const [includeExplanation, setIncludeExplanation] = useState(true);
   const [featureValues, setFeatureValues] = useState<Record<string, string>>({
+    pregnancies: "",
     glucose: "",
     blood_pressure: "",
-    cholesterol: "",
+    skin_thickness: "",
+    insulin: "",
+    bmi: "",
+    diabetes_pedigree_function: "",
     age: "",
   });
   const [symptomsInput, setSymptomsInput] = useState("");
@@ -39,9 +52,15 @@ export default function UploadReportPage() {
 
   const buildPayload = (): AnalyzeReportPayload | null => {
     const features: Record<string, number> = {};
+    const missingRequiredDiabetesFields: string[] = [];
 
-    for (const [key, rawValue] of Object.entries(featureValues)) {
+    for (const field of FEATURE_FIELDS) {
+      const key = String(field.key);
+      const rawValue = featureValues[key] || "";
       if (!rawValue.trim()) {
+        if (reportType === "diabetes") {
+          missingRequiredDiabetesFields.push(field.label);
+        }
         continue;
       }
 
@@ -52,6 +71,11 @@ export default function UploadReportPage() {
       }
 
       features[key] = parsed;
+    }
+
+    if (missingRequiredDiabetesFields.length > 0) {
+      setFormError(`Complete the diabetes fields: ${missingRequiredDiabetesFields.join(", ")}.`);
+      return null;
     }
 
     const symptoms = symptomsInput
@@ -127,8 +151,10 @@ export default function UploadReportPage() {
         </div>
 
         <div className="rounded-3xl border border-slate-200/80 bg-white/80 p-6 shadow-lg shadow-cyan-100/20 backdrop-blur">
-          <h2 className="text-xl font-semibold text-slate-900">2) Clinical Feature Input</h2>
-          <p className="mt-1 text-sm text-slate-500">Manual fallback for precise AI Gateway routing and risk estimation.</p>
+          <h2 className="text-xl font-semibold text-slate-900">2) Diabetes Feature Input</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Manual Pima-style values used by the integrated diabetes decision tree.
+          </p>
 
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             {FEATURE_FIELDS.map((field) => (
@@ -137,7 +163,7 @@ export default function UploadReportPage() {
                 <input
                   type="number"
                   min="0"
-                  step="any"
+                  step={field.step || "1"}
                   value={featureValues[field.key] || ""}
                   onChange={(event) => updateFeature(field.key, event.target.value)}
                   disabled={loading}
