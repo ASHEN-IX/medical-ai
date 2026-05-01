@@ -81,12 +81,14 @@ class ModelLoader:
             "autism_pred": "v2.1",
             "diabetes_pred": "v1.0",
             "kidney_pred": "v1.0",
+            "stroke_pred": "v1.0",
         }
         self.model_response_times_ms = {
             "autism_dl": 0,
             "autism_pred": 0,
             "diabetes_pred": 0,
             "kidney_pred": 0,
+            "stroke_pred": 0,            
         }
         self.load_errors: dict[str, str] = {}
 
@@ -99,7 +101,12 @@ class ModelLoader:
             "kidney_scaler": None,
             "kidney_feature_names": None,
             "kidney_label_encoder": None,
+            "stroke_model": None,
+            "stroke_scaler": None,
         }
+
+        self.stroke_model: Any | None = None
+        self.stroke_scaler: Any | None = None
 
     def _load_pickle_like(self, path: Path) -> Any:
         self._register_numpy_compatibility()
@@ -156,6 +163,7 @@ class ModelLoader:
             self._load_autism_prediction_model()
             self._load_diabetes_model()
             self._load_kidney_disease_model()
+            self._load_stroke_model()
             if self.load_errors:
                 for model_key, reason in self.load_errors.items():
                     logger.error("Model %s is unavailable: %s", model_key, reason)
@@ -407,6 +415,50 @@ class ModelLoader:
             self.prediction_encoders = {}
             logger.exception("Failed to load encoders from %s: %s", encoders_path, exc)
 
+    def _load_stroke_model(self) -> None:
+        model_path = self._resolve_existing_path(
+            [
+                self.models_root / "Stroke_prediction" / "stroke_model.pkl",
+                self.models_root / "stroke-prediction" / "stroke_model.pkl",
+                self.project_root / "models" / "Stroke_prediction" / "stroke_model.pkl",
+                self.project_root / "models" / "stroke-prediction" / "stroke_model.pkl",
+            ]
+        )
+        self._paths["stroke_model"] = str(model_path) if model_path else None
+
+        if model_path is None:
+            self.stroke_model = None
+            self.stroke_scaler = None
+            self.load_errors["stroke_pred"] = "Stroke model file not found"
+            logger.warning("Stroke model file not found")
+            return
+
+        artifact_error = self._validate_artifact(model_path, "Stroke model")
+        if artifact_error is not None:
+            self.stroke_model = None
+            self.stroke_scaler = None
+            self.load_errors["stroke_pred"] = artifact_error
+            logger.error(artifact_error)
+            return
+
+        try:
+            loaded = self._load_pickle_like(model_path)
+            
+            # Handle both dict format (model + scaler) and single model format
+            if isinstance(loaded, dict):
+                self.stroke_model = loaded.get("model")
+                self.stroke_scaler = loaded.get("scaler")
+            else:
+                self.stroke_model = loaded
+                self.stroke_scaler = None
+                
+            logger.info("Loaded stroke model from %s", model_path)
+        except Exception as exc:
+            self.stroke_model = None
+            self.stroke_scaler = None
+            self.load_errors["stroke_pred"] = f"Failed to load stroke model: {exc}"
+            logger.exception("Failed to load stroke model from %s", model_path)
+
     def record_response_time(self, model_key: str, duration_ms: int) -> None:
         if model_key in self.model_response_times_ms:
             self.model_response_times_ms[model_key] = max(0, int(duration_ms))
@@ -416,9 +468,10 @@ class ModelLoader:
         pred_loaded = self.autism_prediction_model is not None
         diabetes_loaded = self.diabetes_model is not None
         kidney_loaded = self.kidney_disease_model is not None and self.kidney_scaler is not None
+        stroke_loaded = self.stroke_model is not None
 
         return {
-            "status": "healthy" if dl_loaded and pred_loaded and diabetes_loaded else "degraded",
+            "status": "healthy" if dl_loaded and pred_loaded and stroke_loaded else "degraded",
             "models": {
                 "autism_dl": ModelHealth(
                     status="loaded" if dl_loaded else "not_loaded",
@@ -439,6 +492,11 @@ class ModelLoader:
                     status="loaded" if kidney_loaded else "not_loaded",
                     version=self.model_versions["kidney_pred"],
                     response_time_ms=self.model_response_times_ms["kidney_pred"],
+                ),
+                "stroke_pred": ModelHealth(
+                    status="loaded" if stroke_loaded else "not_loaded",
+                    version=self.model_versions["stroke_pred"],
+                    response_time_ms=self.model_response_times_ms["stroke_pred"],
                 ),
             },
         }

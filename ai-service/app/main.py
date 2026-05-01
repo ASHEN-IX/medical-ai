@@ -17,7 +17,7 @@ from app.api.routes.autism_prediction import router as autism_prediction_router
 from app.api.routes.ai_gateway import router as ai_gateway_router
 from app.api.routes.diabetes import router as diabetes_router
 from app.api.routes.kidney_disease import router as kidney_disease_router
-from app.api.routes.rag import router as rag_router
+from app.api.routes.stroke import router as stroke_router
 from app.api.routes.report_processing import router as report_processing_router
 from app.api.routes.manual_run import router as manual_run_router
 from app.api.routes.chat import router as chat_router
@@ -175,8 +175,7 @@ app.include_router(autism_prediction_router, prefix="/api/v1")
 app.include_router(diabetes_router, prefix="/api/v1")
 app.include_router(ai_gateway_router, prefix="/api/v1")
 app.include_router(kidney_disease_router, prefix="/api/v1")
-app.include_router(llm_explanation_router, prefix="/api/v1")
-app.include_router(rag_router, prefix="/api/v1")
+app.include_router(stroke_router, prefix="/api/v1")
 app.include_router(report_processing_router, prefix="/api/v1")
 app.include_router(manual_run_router, prefix="/api/v1")
 app.include_router(chat_router, prefix="/api/v1")
