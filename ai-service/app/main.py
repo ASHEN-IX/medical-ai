@@ -19,6 +19,8 @@ from app.api.routes.llm_explanation import router as llm_explanation_router
 from app.api.routes.kidney_disease import router as kidney_disease_router
 from app.api.routes.rag import router as rag_router
 from app.api.routes.report_processing import router as report_processing_router
+from app.api.routes.manual_run import router as manual_run_router
+from app.api.routes.chat import router as chat_router
 from app.knowledge_graph.kg_service import KnowledgeGraphServiceError, knowledge_graph_service
 from app.models.schemas import ErrorDetail, ErrorResponse, HealthResponse
 from app.services.medical_rag_service import MedicalRagServiceError, medical_rag_service
@@ -174,3 +176,5 @@ app.include_router(kidney_disease_router, prefix="/api/v1")
 app.include_router(llm_explanation_router, prefix="/api/v1")
 app.include_router(rag_router, prefix="/api/v1")
 app.include_router(report_processing_router, prefix="/api/v1")
+app.include_router(manual_run_router, prefix="/api/v1")
+app.include_router(chat_router, prefix="/api/v1")

@@ -9,7 +9,6 @@ services:
     build:
       context: ./medical-web
       dockerfile: Dockerfile.frontend
-      pull: false
     container_name: medai-frontend
     ports:
       - "3000:3000"
@@ -33,7 +32,6 @@ services:
     build:
       context: ./medical-api
       dockerfile: Dockerfile.backend
-      pull: false
     container_name: medai-backend
     ports:
       - "4000:4000"
@@ -70,7 +68,6 @@ services:
     build:
       context: ./ai-service
       dockerfile: Dockerfile.ai
-      pull: false
     container_name: medai-ai-service
     ports:
       - "8001:8001"

@@ -108,11 +108,11 @@ export default function FileUploader({ file, disabled = false, onFileSelected }:
           setDragging(false);
         }}
         onDrop={onDrop}
-        className={`group flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-6 py-10 text-center transition-all ${
+        className={`group flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-12 text-center transition-all duration-300 backdrop-blur-sm ${
           dragging
-            ? "border-cyan-500 bg-cyan-50"
-            : "border-slate-300 bg-white/75 hover:border-cyan-400 hover:bg-cyan-50/60"
-        } ${disabled ? "cursor-not-allowed opacity-70" : ""}`}
+            ? "border-cyan-400 bg-cyan-500/20"
+            : "border-white/20 bg-white/5 hover:border-white/40 hover:bg-white/10"
+        } ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
       >
         <input
           ref={inputRef}
@@ -123,28 +123,28 @@ export default function FileUploader({ file, disabled = false, onFileSelected }:
           onChange={onInputChange}
         />
 
-        <p className="text-lg font-semibold text-slate-800">Drop report file here</p>
-        <p className="mt-2 text-sm text-slate-500">or click to upload PDF or medical image</p>
-        <p className="mt-1 text-xs text-slate-400">Max {MAX_FILE_SIZE_MB} MB</p>
+        <p className="text-lg font-semibold text-white">Drop report file here</p>
+        <p className="mt-2 text-sm text-white/70">or click to upload PDF or medical image</p>
+        <p className="mt-1 text-xs text-white/60">Max {MAX_FILE_SIZE_MB} MB</p>
       </label>
 
       {file ? (
-        <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white/80 px-4 py-3">
+        <div className="flex items-center justify-between rounded-lg border border-white/20 bg-white/5 px-4 py-3 backdrop-blur-sm transition-all duration-300">
           <div>
-            <p className="text-sm font-semibold text-slate-800">{file.name}</p>
-            <p className="text-xs text-slate-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+            <p className="text-sm font-semibold text-white">{file.name}</p>
+            <p className="text-xs text-white/70">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
           </div>
           <button
             type="button"
             onClick={clearSelection}
-            className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+            className="rounded-md border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition-all duration-300 hover:border-white/40 hover:bg-white/20"
           >
             Remove
           </button>
         </div>
       ) : null}
 
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      {error ? <p className="text-sm text-red-400">{error}</p> : null}
     </div>
   );
 }
