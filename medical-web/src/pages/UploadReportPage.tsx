@@ -9,11 +9,20 @@ import { processReportFile, type AnalyzeReportPayload, type ProcessReportRespons
 const REPORT_TYPES: ReportType[] = ["auto", "diabetes", "heart", "kidney", "stroke", "autism", "mixed"];
 const AVAILABLE_MODELS = ["diabetes", "heart", "kidney", "stroke", "autism_dl", "autism_pred"];
 
-const FEATURE_FIELDS: Array<{ key: string; label: string; placeholder: string }> = [
-  { key: "glucose", label: "Glucose (mg/dL)", placeholder: "180" },
-  { key: "blood_pressure", label: "Blood Pressure (systolic)", placeholder: "140" },
-  { key: "cholesterol", label: "Cholesterol (mg/dL)", placeholder: "220" },
-  { key: "age", label: "Age", placeholder: "45" },
+const FEATURE_FIELDS: Array<{
+  key: keyof AnalyzeReportPayload["features"] | string;
+  label: string;
+  placeholder: string;
+  step?: string;
+}> = [
+  { key: "pregnancies", label: "Pregnancies", placeholder: "2" },
+  { key: "glucose", label: "Glucose", placeholder: "148" },
+  { key: "blood_pressure", label: "Blood Pressure", placeholder: "72" },
+  { key: "skin_thickness", label: "Skin Thickness", placeholder: "35" },
+  { key: "insulin", label: "Insulin", placeholder: "0" },
+  { key: "bmi", label: "BMI", placeholder: "33.6", step: "0.1" },
+  { key: "diabetes_pedigree_function", label: "Diabetes Pedigree Function", placeholder: "0.63", step: "0.01" },
+  { key: "age", label: "Age", placeholder: "50" },
 ];
 
 export default function UploadReportPage() {
@@ -23,19 +32,16 @@ export default function UploadReportPage() {
   // Tab state
   const [tab, setTab] = useState<"upload" | "manual">("upload");
 
-  // Report Upload tab state
-  const [reportType, setReportType] = useState<ReportType>("auto");
+  const [reportType, setReportType] = useState<ReportType>("diabetes");
   const [includeExplanation, setIncludeExplanation] = useState(true);
-  const [file, setFile] = useState<File | null>(null);
-  const [imageBase64, setImageBase64] = useState<string | null>(null);
-  const [processedReport, setProcessedReport] = useState<ProcessReportResponse | null>(null);
-  const [reportError, setReportError] = useState<string | null>(null);
-
-  // Manual testing tab state
-  const [manualFeatures, setManualFeatures] = useState<Record<string, string>>({
+  const [featureValues, setFeatureValues] = useState<Record<string, string>>({
+    pregnancies: "",
     glucose: "",
     blood_pressure: "",
-    cholesterol: "",
+    skin_thickness: "",
+    insulin: "",
+    bmi: "",
+    diabetes_pedigree_function: "",
     age: "",
   });
   const [manualSymptoms, setManualSymptoms] = useState("");
@@ -48,9 +54,19 @@ export default function UploadReportPage() {
     setManualFeatures((prev) => ({ ...prev, [field]: value }));
   };
 
-  const toggleModel = (model: string) => {
-    setSelectedModels((prev) => (prev.includes(model) ? prev.filter((m) => m !== model) : [...prev, model]));
-  };
+  const buildPayload = (): AnalyzeReportPayload | null => {
+    const features: Record<string, number> = {};
+    const missingRequiredDiabetesFields: string[] = [];
+
+    for (const field of FEATURE_FIELDS) {
+      const key = String(field.key);
+      const rawValue = featureValues[key] || "";
+      if (!rawValue.trim()) {
+        if (reportType === "diabetes") {
+          missingRequiredDiabetesFields.push(field.label);
+        }
+        continue;
+      }
 
   // Report Upload workflow
   const handleReportAnalyze = async () => {
@@ -62,23 +78,15 @@ export default function UploadReportPage() {
       return;
     }
 
-    try {
-      let reportExtraction: ProcessReportResponse | null = processedReport;
-      if (!reportExtraction) {
-        reportExtraction = await processReportFile(file);
-        setProcessedReport(reportExtraction);
-      }
+    if (missingRequiredDiabetesFields.length > 0) {
+      setFormError(`Complete the diabetes fields: ${missingRequiredDiabetesFields.join(", ")}.`);
+      return null;
+    }
 
-      const payload: AnalyzeReportPayload = {
-        report_type: reportType === "auto" && reportExtraction?.report_type
-          ? (reportExtraction.report_type as ReportType)
-          : reportType,
-        features: reportExtraction?.features || {},
-        raw_text: reportExtraction?.raw_text,
-        include_explanation: includeExplanation,
-        symptoms: [],
-        image: imageBase64 || undefined,
-      };
+    const symptoms = symptomsInput
+      .split(",")
+      .map((segment) => segment.trim())
+      .filter(Boolean);
 
       const historyItem = await analyze(payload);
       router.push("/results");
@@ -173,25 +181,25 @@ export default function UploadReportPage() {
           </button>
         </div>
 
-        {/* Report Upload Tab */}
-        {tab === "upload" && (
-          <div className="space-y-6 animate-in fade-in duration-500">
-            {/* Report Upload */}
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-8 shadow-2xl backdrop-blur-xl transition-all duration-500 hover:border-white/20 hover:bg-white/10">
-              <h2 className="text-2xl font-bold text-white">Upload Medical Report</h2>
-              <p className="mt-2 text-sm text-white/60">
-                Upload a PDF or medical image. Our system will extract and analyze the content.
-              </p>
+        <div className="rounded-3xl border border-slate-200/80 bg-white/80 p-6 shadow-lg shadow-cyan-100/20 backdrop-blur">
+          <h2 className="text-xl font-semibold text-slate-900">2) Diabetes Feature Input</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Manual Pima-style values used by the integrated diabetes decision tree.
+          </p>
 
-              <div className="mt-6">
-                <FileUploader
-                  file={file}
-                  disabled={gatewayLoading}
-                  onFileSelected={(f, img) => {
-                    setFile(f);
-                    setImageBase64(img);
-                    setProcessedReport(null);
-                  }}
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            {FEATURE_FIELDS.map((field) => (
+              <label key={field.key} className="space-y-1.5">
+                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{field.label}</span>
+                <input
+                  type="number"
+                  min="0"
+                  step={field.step || "1"}
+                  value={featureValues[field.key] || ""}
+                  onChange={(event) => updateFeature(field.key, event.target.value)}
+                  disabled={loading}
+                  placeholder={field.placeholder}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
                 />
               </div>
 

@@ -47,6 +47,17 @@ DEFAULT_FEATURE_COLUMNS = [
     "relation",
 ]
 
+DIABETES_FEATURE_COLUMNS = [
+    "Pregnancies",
+    "Glucose",
+    "BloodPressure",
+    "SkinThickness",
+    "Insulin",
+    "BMI",
+    "DiabetesPedigreeFunction",
+    "Age",
+]
+
 
 class ModelLoader:
     def __init__(self) -> None:
@@ -56,6 +67,8 @@ class ModelLoader:
 
         self.autism_dl_model: Any | None = None
         self.autism_prediction_model: Any | None = None
+        self.diabetes_model: Any | None = None
+        self.diabetes_feature_columns: list[str] = DIABETES_FEATURE_COLUMNS[:]
         self.kidney_disease_model: Any | None = None
         self.kidney_scaler: Any | None = None
         self.kidney_feature_names: list[str] = []
@@ -66,11 +79,13 @@ class ModelLoader:
         self.model_versions = {
             "autism_dl": "v1.0",
             "autism_pred": "v2.1",
+            "diabetes_pred": "v1.0",
             "kidney_pred": "v1.0",
         }
         self.model_response_times_ms = {
             "autism_dl": 0,
             "autism_pred": 0,
+            "diabetes_pred": 0,
             "kidney_pred": 0,
         }
         self.load_errors: dict[str, str] = {}
@@ -79,6 +94,7 @@ class ModelLoader:
             "autism_dl": None,
             "autism_pred": None,
             "encoders": None,
+            "diabetes_model": None,
             "kidney_model": None,
             "kidney_scaler": None,
             "kidney_feature_names": None,
@@ -138,12 +154,51 @@ class ModelLoader:
             self.load_errors = {}
             self._load_autism_dl_model()
             self._load_autism_prediction_model()
+            self._load_diabetes_model()
             self._load_kidney_disease_model()
             if self.load_errors:
                 for model_key, reason in self.load_errors.items():
                     logger.error("Model %s is unavailable: %s", model_key, reason)
             else:
                 logger.info("All configured models loaded successfully")
+
+    def _load_diabetes_model(self) -> None:
+        model_path = self._resolve_existing_path(
+            [
+                self.models_root / "diabetes" / "diabetes_decision_tree.joblib",
+                self.models_root / "diabetes_decision_tree.joblib",
+                self.project_root / "models" / "diabetes" / "diabetes_decision_tree.joblib",
+                self.project_root / "legacy" / "diabetes" / "models" / "diabetes_decision_tree.joblib",
+            ]
+        )
+        self._paths["diabetes_model"] = str(model_path) if model_path else None
+
+        if model_path is None:
+            self.diabetes_model = None
+            self.diabetes_feature_columns = DIABETES_FEATURE_COLUMNS[:]
+            self.load_errors["diabetes_pred"] = "Model file diabetes_decision_tree.joblib not found"
+            logger.warning("Diabetes model file not found")
+            return
+
+        artifact_error = self._validate_artifact(model_path, "Diabetes model")
+        if artifact_error is not None:
+            self.diabetes_model = None
+            self.diabetes_feature_columns = DIABETES_FEATURE_COLUMNS[:]
+            self.load_errors["diabetes_pred"] = artifact_error
+            logger.error(artifact_error)
+            return
+
+        try:
+            self.diabetes_model = self._load_pickle_like(model_path)
+            self.diabetes_feature_columns = [
+                str(item) for item in getattr(self.diabetes_model, "feature_names_in_", DIABETES_FEATURE_COLUMNS)
+            ]
+            logger.info("Loaded diabetes decision tree model from %s", model_path)
+        except Exception as exc:  # pragma: no cover - runtime dependency behavior
+            self.diabetes_model = None
+            self.diabetes_feature_columns = DIABETES_FEATURE_COLUMNS[:]
+            self.load_errors["diabetes_pred"] = f"Failed to load diabetes model: {exc}"
+            logger.exception("Failed loading diabetes model from %s", model_path)
 
     def _load_kidney_disease_model(self) -> None:
         model_path = self._resolve_existing_path(
@@ -359,10 +414,11 @@ class ModelLoader:
     def get_health_payload(self) -> dict[str, Any]:
         dl_loaded = self.autism_dl_model is not None
         pred_loaded = self.autism_prediction_model is not None
+        diabetes_loaded = self.diabetes_model is not None
         kidney_loaded = self.kidney_disease_model is not None and self.kidney_scaler is not None
 
         return {
-            "status": "healthy" if dl_loaded and pred_loaded else "degraded",
+            "status": "healthy" if dl_loaded and pred_loaded and diabetes_loaded else "degraded",
             "models": {
                 "autism_dl": ModelHealth(
                     status="loaded" if dl_loaded else "not_loaded",
@@ -373,6 +429,11 @@ class ModelLoader:
                     status="loaded" if pred_loaded else "not_loaded",
                     version=self.model_versions["autism_pred"],
                     response_time_ms=self.model_response_times_ms["autism_pred"],
+                ),
+                "diabetes_pred": ModelHealth(
+                    status="loaded" if diabetes_loaded else "not_loaded",
+                    version=self.model_versions["diabetes_pred"],
+                    response_time_ms=self.model_response_times_ms["diabetes_pred"],
                 ),
                 "kidney_pred": ModelHealth(
                     status="loaded" if kidney_loaded else "not_loaded",
