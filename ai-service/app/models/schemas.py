@@ -181,3 +181,32 @@ class HealthResponse(BaseModel):
     version: str
     models: Dict[str, ModelHealth]
     timestamp: datetime
+
+# Stroke schemas
+class StrokeClassProbabilities(BaseModel):
+    stroke: float
+    non_stroke: float
+
+class StrokePredictionResult(BaseModel):
+    stroke_detected: bool
+    risk_level: Literal["LOW", "MEDIUM", "HIGH"]
+    confidence_score: float
+    stroke_probability: float
+    class_probabilities: StrokeClassProbabilities
+
+class StrokeRequest(BaseModel):
+    age: float = Field(..., ge=0, le=120)
+    hypertension: int = Field(..., ge=0, le=1)
+    heart_disease: int = Field(..., ge=0, le=1)
+    bmi: float = Field(..., ge=0, le=60)
+    ever_married: Literal["Yes", "No"]
+    work_type: Literal["Self-employed", "children", "Private", "Govt_job", "Never_worked"]
+    smoking_status: Literal["Unknown", "formerly smoked", "never smoked", "smokes"]
+    avg_glucose_level: float = Field(..., ge=0, le=300)
+
+class StrokeResponse(BaseModel):
+    success: bool = True
+    prediction: StrokePredictionResult
+    recommendations: List[str]
+    metadata: Metadata
+    request_id: str
