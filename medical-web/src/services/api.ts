@@ -201,6 +201,29 @@ export async function analyzeReportDirect(payload: AnalyzeReportPayload): Promis
   }
 }
 
+export interface ManualModelRunResponse {
+  success: boolean;
+  results: Record<string, { risk: string; confidence: number }>;
+  details?: Record<string, unknown>;
+  failures?: Record<string, string>;
+}
+
+export async function runManualModels(
+  selectedModels: string[],
+  payload: Partial<AnalyzeReportPayload>
+): Promise<ManualModelRunResponse> {
+  try {
+    const { data } = await aiGatewayApi.post<ManualModelRunResponse>("/api/v1/ai/run-model", {
+      selected_models: selectedModels,
+      ...payload,
+    });
+
+    return data;
+  } catch (error) {
+    throw normalizeError(error);
+  }
+}
+
 export async function processReportFile(file: File): Promise<ProcessReportResponse> {
   try {
     const formData = new FormData();
