@@ -35,7 +35,10 @@ export default function UploadReportPage() {
   const [manualFeatures, setManualFeatures] = useState<Record<string, string>>({
     glucose: "",
     blood_pressure: "",
-    cholesterol: "",
+    skin_thickness: "",
+    insulin: "",
+    bmi: "",
+    diabetes_pedigree_function: "",
     age: "",
   });
   const [manualSymptoms, setManualSymptoms] = useState("");

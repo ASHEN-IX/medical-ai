@@ -5,9 +5,21 @@ from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
 
-import pytesseract
-from PIL import Image, UnidentifiedImageError
-from PyPDF2 import PdfReader
+try:
+    import pytesseract
+except ImportError:  # pragma: no cover - depends on optional runtime package
+    pytesseract = None
+
+try:
+    from PIL import Image, UnidentifiedImageError
+except ImportError:  # pragma: no cover - depends on optional runtime package
+    Image = None
+    UnidentifiedImageError = ValueError
+
+try:
+    from PyPDF2 import PdfReader
+except ImportError:  # pragma: no cover - depends on optional runtime package
+    PdfReader = None
 
 
 logger = logging.getLogger(__name__)
@@ -33,17 +45,24 @@ class OCRService:
         if content_type_value.startswith("image/") or suffix in self.IMAGE_EXTENSIONS:
             return "image"
 
-        try:
-            with Image.open(BytesIO(file_bytes)) as image:
-                image.verify()
-            return "image"
-        except Exception:  # pylint: disable=broad-except
-            pass
+        if Image is not None:
+            try:
+                with Image.open(BytesIO(file_bytes)) as image:
+                    image.verify()
+                return "image"
+            except Exception:  # pylint: disable=broad-except
+                pass
 
         raise ValueError("Unsupported file format. Use PDF, PNG, JPG, or JPEG.")
 
     def extract_text_from_image(self, file_bytes: bytes) -> OCRResult:
         logger.info("OCR image extraction started")
+        if Image is None or pytesseract is None:
+            fallback_text = self._decode_text_fallback(file_bytes)
+            if fallback_text:
+                return OCRResult(text=fallback_text, extraction_method="binary_text_fallback")
+            raise RuntimeError("Image OCR dependencies are not installed")
+
         try:
             with Image.open(BytesIO(file_bytes)) as image:
                 rgb_image = image.convert("RGB")
@@ -75,6 +94,12 @@ class OCRService:
 
     def extract_text_from_pdf(self, file_bytes: bytes) -> OCRResult:
         logger.info("PDF extraction started")
+        if PdfReader is None:
+            fallback_text = self._decode_text_fallback(file_bytes)
+            if fallback_text:
+                return OCRResult(text=fallback_text, extraction_method="binary_text_fallback")
+            raise RuntimeError("PDF extraction dependency PyPDF2 is not installed")
+
         try:
             reader = PdfReader(BytesIO(file_bytes))
         except Exception as exc:  # pylint: disable=broad-except
@@ -109,6 +134,9 @@ class OCRService:
         raise RuntimeError("No text could be extracted from PDF")
 
     def _extract_text_from_pdf_images(self, reader: PdfReader) -> str:
+        if Image is None or pytesseract is None:
+            return ""
+
         extracted_segments: list[str] = []
         for page_index, page in enumerate(reader.pages, start=1):
             page_images = getattr(page, "images", [])

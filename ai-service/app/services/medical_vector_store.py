@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Any, Sequence
 
-import faiss
 import numpy as np
 
 from app.services.medical_knowledge_loader import MedicalKnowledgeChunk
+
+try:
+    import faiss
+except ImportError:  # pragma: no cover - depends on optional runtime package
+    faiss = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,7 +28,7 @@ class MedicalVectorStoreError(RuntimeError):
 
 class MedicalVectorStore:
     def __init__(self) -> None:
-        self._index: faiss.Index | None = None
+        self._index: Any | None = None
         self._chunks: list[MedicalKnowledgeChunk] = []
         self._dimension: int | None = None
 
@@ -33,6 +37,9 @@ class MedicalVectorStore:
         return self._index is not None and bool(self._chunks)
 
     def build(self, embeddings: np.ndarray, chunks: Sequence[MedicalKnowledgeChunk]) -> None:
+        if faiss is None:
+            raise MedicalVectorStoreError("FAISS dependency is not installed")
+
         if embeddings.size == 0:
             raise MedicalVectorStoreError("Cannot build FAISS index without embeddings")
 
