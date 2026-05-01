@@ -1,13 +1,20 @@
 from __future__ import annotations
 
 import logging
+import importlib
 import os
 import pickle
 import threading
+import sys
 from pathlib import Path
 from typing import Any, Optional
 
 from app.models.schemas import ModelHealth
+
+try:
+    import numpy as _numpy
+except Exception:  # pragma: no cover - runtime dependency handling
+    _numpy = None
 
 try:
     import tensorflow as tf
@@ -40,6 +47,17 @@ DEFAULT_FEATURE_COLUMNS = [
     "relation",
 ]
 
+DIABETES_FEATURE_COLUMNS = [
+    "Pregnancies",
+    "Glucose",
+    "BloodPressure",
+    "SkinThickness",
+    "Insulin",
+    "BMI",
+    "DiabetesPedigreeFunction",
+    "Age",
+]
+
 
 class ModelLoader:
     def __init__(self) -> None:
@@ -49,6 +67,8 @@ class ModelLoader:
 
         self.autism_dl_model: Any | None = None
         self.autism_prediction_model: Any | None = None
+        self.diabetes_model: Any | None = None
+        self.diabetes_feature_columns: list[str] = DIABETES_FEATURE_COLUMNS[:]
         self.kidney_disease_model: Any | None = None
         self.kidney_scaler: Any | None = None
         self.kidney_feature_names: list[str] = []
@@ -59,12 +79,14 @@ class ModelLoader:
         self.model_versions = {
             "autism_dl": "v1.0",
             "autism_pred": "v2.1",
+            "diabetes_pred": "v1.0",
             "kidney_pred": "v1.0",
             "stroke_pred": "v1.0",
         }
         self.model_response_times_ms = {
             "autism_dl": 0,
             "autism_pred": 0,
+            "diabetes_pred": 0,
             "kidney_pred": 0,
             "stroke_pred": 0,            
         }
@@ -74,6 +96,7 @@ class ModelLoader:
             "autism_dl": None,
             "autism_pred": None,
             "encoders": None,
+            "diabetes_model": None,
             "kidney_model": None,
             "kidney_scaler": None,
             "kidney_feature_names": None,
@@ -86,6 +109,7 @@ class ModelLoader:
         self.stroke_scaler: Any | None = None
 
     def _load_pickle_like(self, path: Path) -> Any:
+        self._register_numpy_compatibility()
         try:
             import joblib
 
@@ -93,6 +117,26 @@ class ModelLoader:
         except Exception:
             with path.open("rb") as file:
                 return pickle.load(file)
+
+    def _register_numpy_compatibility(self) -> None:
+        if _numpy is None:
+            return
+
+        # Legacy pickles may reference the old/alternate numpy internal module paths.
+        # Register aliases so unpickling can resolve the expected imports.
+        core_pkg = importlib.import_module("numpy.core")
+        setattr(_numpy, "_core", core_pkg)
+
+        numpy_aliases = {
+            "numpy._core": core_pkg,
+            "numpy._core.multiarray": importlib.import_module("numpy.core.multiarray"),
+            "numpy._core.numeric": importlib.import_module("numpy.core.numeric"),
+            "numpy._core.umath": importlib.import_module("numpy.core.umath"),
+            "numpy._core._multiarray_umath": importlib.import_module("numpy.core._multiarray_umath"),
+        }
+
+        for module_name, module_obj in numpy_aliases.items():
+            sys.modules[module_name] = module_obj
 
     def _resolve_existing_path(self, candidates: list[Path]) -> Optional[Path]:
         for path in candidates:
@@ -117,6 +161,7 @@ class ModelLoader:
             self.load_errors = {}
             self._load_autism_dl_model()
             self._load_autism_prediction_model()
+            self._load_diabetes_model()
             self._load_kidney_disease_model()
             self._load_stroke_model()
             if self.load_errors:
@@ -124,6 +169,44 @@ class ModelLoader:
                     logger.error("Model %s is unavailable: %s", model_key, reason)
             else:
                 logger.info("All configured models loaded successfully")
+
+    def _load_diabetes_model(self) -> None:
+        model_path = self._resolve_existing_path(
+            [
+                self.models_root / "diabetes" / "diabetes_decision_tree.joblib",
+                self.models_root / "diabetes_decision_tree.joblib",
+                self.project_root / "models" / "diabetes" / "diabetes_decision_tree.joblib",
+                self.project_root / "legacy" / "diabetes" / "models" / "diabetes_decision_tree.joblib",
+            ]
+        )
+        self._paths["diabetes_model"] = str(model_path) if model_path else None
+
+        if model_path is None:
+            self.diabetes_model = None
+            self.diabetes_feature_columns = DIABETES_FEATURE_COLUMNS[:]
+            self.load_errors["diabetes_pred"] = "Model file diabetes_decision_tree.joblib not found"
+            logger.warning("Diabetes model file not found")
+            return
+
+        artifact_error = self._validate_artifact(model_path, "Diabetes model")
+        if artifact_error is not None:
+            self.diabetes_model = None
+            self.diabetes_feature_columns = DIABETES_FEATURE_COLUMNS[:]
+            self.load_errors["diabetes_pred"] = artifact_error
+            logger.error(artifact_error)
+            return
+
+        try:
+            self.diabetes_model = self._load_pickle_like(model_path)
+            self.diabetes_feature_columns = [
+                str(item) for item in getattr(self.diabetes_model, "feature_names_in_", DIABETES_FEATURE_COLUMNS)
+            ]
+            logger.info("Loaded diabetes decision tree model from %s", model_path)
+        except Exception as exc:  # pragma: no cover - runtime dependency behavior
+            self.diabetes_model = None
+            self.diabetes_feature_columns = DIABETES_FEATURE_COLUMNS[:]
+            self.load_errors["diabetes_pred"] = f"Failed to load diabetes model: {exc}"
+            logger.exception("Failed loading diabetes model from %s", model_path)
 
     def _load_kidney_disease_model(self) -> None:
         model_path = self._resolve_existing_path(
@@ -288,8 +371,7 @@ class ModelLoader:
             return
 
         try:
-            with model_path.open("rb") as file:
-                self.autism_prediction_model = pickle.load(file)
+            self.autism_prediction_model = self._load_pickle_like(model_path)
             self.feature_columns = list(
                 getattr(self.autism_prediction_model, "feature_names_in_", DEFAULT_FEATURE_COLUMNS)
             )
@@ -322,8 +404,7 @@ class ModelLoader:
             return
 
         try:
-            with encoders_path.open("rb") as file:
-                encoders = pickle.load(file)
+            encoders = self._load_pickle_like(encoders_path)
             if isinstance(encoders, dict):
                 self.prediction_encoders = encoders
             else:
@@ -385,6 +466,7 @@ class ModelLoader:
     def get_health_payload(self) -> dict[str, Any]:
         dl_loaded = self.autism_dl_model is not None
         pred_loaded = self.autism_prediction_model is not None
+        diabetes_loaded = self.diabetes_model is not None
         kidney_loaded = self.kidney_disease_model is not None and self.kidney_scaler is not None
         stroke_loaded = self.stroke_model is not None
 
@@ -400,6 +482,11 @@ class ModelLoader:
                     status="loaded" if pred_loaded else "not_loaded",
                     version=self.model_versions["autism_pred"],
                     response_time_ms=self.model_response_times_ms["autism_pred"],
+                ),
+                "diabetes_pred": ModelHealth(
+                    status="loaded" if diabetes_loaded else "not_loaded",
+                    version=self.model_versions["diabetes_pred"],
+                    response_time_ms=self.model_response_times_ms["diabetes_pred"],
                 ),
                 "kidney_pred": ModelHealth(
                     status="loaded" if kidney_loaded else "not_loaded",

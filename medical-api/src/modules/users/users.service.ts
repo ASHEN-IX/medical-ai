@@ -14,7 +14,7 @@ export class UsersService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async getUserById(id: string): Promise<Partial<User>> {
+  async getUserById(id: string): Promise<Partial<User> & { doctorProfile?: any }> {
     const user = await this.prisma.user.findUnique({
       where: { id },
       select: {
@@ -22,8 +22,12 @@ export class UsersService {
         name: true,
         email: true,
         role: true,
+        age: true,
+        gender: true,
+        medicalBackground: true,
         createdAt: true,
         updatedAt: true,
+        doctorProfile: true,
       },
     });
 
@@ -34,37 +38,37 @@ export class UsersService {
     return user;
   }
 
-  async getMe(userId: string): Promise<Partial<User>> {
+  async getMe(userId: string) {
     return this.getUserById(userId);
   }
 
   async updateUser(
     userId: string,
     updateUserDto: UpdateUserDto,
-  ): Promise<Partial<User>> {
+  ) {
     const user = await this.prisma.user.update({
       where: { id: userId },
-      data: updateUserDto,
+      data: updateUserDto as any,
       select: {
         id: true,
         name: true,
         email: true,
         role: true,
+        age: true,
+        gender: true,
+        medicalBackground: true,
         createdAt: true,
         updatedAt: true,
       },
     });
 
-    this.logger.log(`✅ User ${userId} updated`);
+    this.logger.log(`User ${userId} updated`);
     return user;
   }
 
-  async getAllUsers(
-    requesterRole: UserRole,
-  ): Promise<Partial<User>[] | null> {
-    // Only admins can see all users
-    if (requesterRole !== UserRole.ADMIN) {
-      throw new ForbiddenException('Only admins can view all users');
+  async getAllUsers(requesterRole: UserRole) {
+    if (requesterRole !== UserRole.DOCTOR && requesterRole !== UserRole.ADMIN) {
+      throw new ForbiddenException('Only doctors and admins can view all users');
     }
 
     return this.prisma.user.findMany({
@@ -73,13 +77,15 @@ export class UsersService {
         name: true,
         email: true,
         role: true,
+        age: true,
+        gender: true,
         createdAt: true,
         updatedAt: true,
       },
     });
   }
 
-  async getUsersByRole(role: UserRole): Promise<Partial<User>[]> {
+  async getUsersByRole(role: UserRole) {
     return this.prisma.user.findMany({
       where: { role },
       select: {
@@ -87,8 +93,29 @@ export class UsersService {
         name: true,
         email: true,
         role: true,
+        age: true,
+        gender: true,
         createdAt: true,
         updatedAt: true,
+        doctorProfile: role === UserRole.DOCTOR ? true : undefined,
+      },
+    });
+  }
+
+  async getDoctors() {
+    return this.prisma.user.findMany({
+      where: { role: UserRole.DOCTOR },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        doctorProfile: {
+          select: {
+            specialty: true,
+            verified: true,
+            bio: true,
+          },
+        },
       },
     });
   }

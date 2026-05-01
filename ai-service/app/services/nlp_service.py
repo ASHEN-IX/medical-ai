@@ -3,10 +3,16 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
+from typing import Any
 
-import spacy
-from spacy.language import Language
-from spacy.tokens import Doc
+try:
+    import spacy
+    from spacy.language import Language
+    from spacy.tokens import Doc
+except ImportError:  # pragma: no cover - depends on optional runtime package
+    spacy = None
+    Language = Any
+    Doc = Any
 
 from app.utils.medical_patterns import (
     BMI_PATTERN,
@@ -24,6 +30,10 @@ logger = logging.getLogger(__name__)
 
 
 def _load_spacy_model() -> Language:
+    if spacy is None:
+        logger.warning("spaCy dependency is not installed. NLP report processing will use regex extraction only.")
+        return None
+
     try:
         return spacy.load("en_core_web_sm")
     except OSError:
@@ -62,7 +72,7 @@ class NLPService:
                 cleaned_text=cleaned_text,
             )
 
-        doc = self.nlp(cleaned_text)
+        doc = self.nlp(cleaned_text) if self.nlp is not None else None
         features, confidence_scores = self.extract_medical_features(cleaned_text, doc)
         report_type = self.classify_report_type(cleaned_text, features)
 
@@ -73,7 +83,7 @@ class NLPService:
             cleaned_text=cleaned_text,
         )
 
-    def extract_medical_features(self, text: str, doc: Doc) -> tuple[dict[str, float | int], dict[str, float]]:
+    def extract_medical_features(self, text: str, doc: Doc | None) -> tuple[dict[str, float | int], dict[str, float]]:
         features: dict[str, float | int] = {}
         confidence_scores: dict[str, float] = {}
 
@@ -117,7 +127,8 @@ class NLPService:
                 features["bmi"] = round(bmi_value, 2)
                 confidence_scores["bmi"] = 0.9
 
-        self._fill_missing_from_ner(text, doc, features, confidence_scores)
+        if doc is not None:
+            self._fill_missing_from_ner(text, doc, features, confidence_scores)
         return features, confidence_scores
 
     def classify_report_type(self, text: str, features: dict[str, float | int]) -> str:

@@ -10,10 +10,141 @@ import {
   formatDateTime,
   formatModelName,
   priorityBadgeClass,
+  formatConfidence,
   riskProgressValue,
 } from "@/utils/formatters";
 
-const CORE_MODELS = ["diabetes", "heart", "stroke"];
+const CORE_MODELS = ["diabetes", "heart", "kidney", "stroke"];
+const AUTISM_MODELS = ["autism_pred", "autism_dl"];
+
+const AUTISM_RECOMMENDATIONS = [
+  "Refer the child to a pediatric neurodevelopmental specialist for a formal diagnostic assessment.",
+  "Continue early-intervention support while awaiting evaluation results.",
+  "Consider speech and language assessment if communication delay is present.",
+  "Track social interaction, play behavior, and repetitive movements over time and share them with the clinician.",
+];
+
+const AUTISM_FOLLOW_UP_QUESTIONS = [
+  "Does the child consistently respond when their name is called?",
+  "Does the child use pointing, gestures, or eye contact to share interest?",
+  "Does the child engage in pretend play or social back-and-forth play?",
+  "Have language milestones or daily communication skills been delayed?",
+  "Are repetitive movements, restricted interests, or sensory sensitivities present?",
+];
+
+function isAutismFocused(selectedModels: string[]): boolean {
+  return selectedModels.some((modelName) => AUTISM_MODELS.includes(modelName));
+}
+
+function getDetectedCondition(selectedModels: string[], overallRisk: string): string {
+  if (selectedModels.includes("autism_pred") || selectedModels.includes("autism_dl")) {
+    return "Autism Spectrum Screening";
+  }
+
+  if (selectedModels.includes("stroke")) {
+    return "Stroke Risk Review";
+  }
+
+  if (selectedModels.includes("kidney")) {
+    return "Kidney Disease Risk Review";
+  }
+
+  if (selectedModels.includes("heart")) {
+    return "Cardiometabolic Risk Review";
+  }
+
+  if (selectedModels.includes("diabetes")) {
+    return "Diabetes Risk Review";
+  }
+
+  return overallRisk === "HIGH" ? "Clinical Review" : "Monitoring Summary";
+}
+
+function buildClinicalSummary(selectedModels: string[], overallRisk: string, finalDecision: string): string {
+  if (isAutismFocused(selectedModels)) {
+    return "Screening pattern is consistent with autism spectrum features. This result supports follow-up evaluation and does not replace a clinical diagnosis.";
+  }
+
+  if (overallRisk === "HIGH") {
+    return "The analysis indicates a high-risk pattern that warrants prompt clinician review and closer follow-up.";
+  }
+
+  if (overallRisk === "MEDIUM") {
+    return "The analysis shows a moderate-risk pattern. Clinical review and preventive monitoring are recommended.";
+  }
+
+  if (finalDecision) {
+    return `The analysis supports ${finalDecision.toLowerCase().replace(/_/g, " ")}.`;
+  }
+
+  return "The analysis does not show a strong disease signal, but routine monitoring is still appropriate.";
+}
+
+function buildRecommendations(selectedModels: string[], overallRisk: string, finalDecision: string): string[] {
+  if (isAutismFocused(selectedModels)) {
+    return AUTISM_RECOMMENDATIONS;
+  }
+
+  if (overallRisk === "HIGH") {
+    return [
+      "Arrange a prompt clinical review to confirm findings and plan next steps.",
+      "Repeat or expand testing if symptoms are progressing or new symptoms appear.",
+      "Review lifestyle, medication, and family history with the treating clinician.",
+    ];
+  }
+
+  if (overallRisk === "MEDIUM") {
+    return [
+      "Schedule a follow-up visit to review risk factors and trends over time.",
+      "Monitor for new symptoms and document any changes in the report history.",
+      "Use the result as a screening aid, not a final diagnosis.",
+    ];
+  }
+
+  return [
+    "Continue routine monitoring and re-evaluate if symptoms change.",
+    "Share this result with a qualified clinician if there are ongoing concerns.",
+    finalDecision ? `Current gateway decision: ${finalDecision}.` : "No urgent abnormality was identified in this scan.",
+  ];
+}
+
+function buildFollowUpQuestions(selectedModels: string[], overallRisk: string): string[] {
+  if (isAutismFocused(selectedModels)) {
+    return AUTISM_FOLLOW_UP_QUESTIONS;
+  }
+
+  if (selectedModels.includes("stroke")) {
+    return [
+      "Did the symptoms start suddenly or gradually?",
+      "Is there facial droop, speech difficulty, arm weakness, or vision loss?",
+      "Does the person have a history of hypertension, diabetes, or smoking?",
+      "Have the symptoms improved, stayed the same, or worsened?",
+    ];
+  }
+
+  if (selectedModels.includes("kidney")) {
+    return [
+      "Has there been swelling, reduced urine output, or foamy urine?",
+      "Are creatinine, eGFR, or blood pressure values changing over time?",
+      "Has the patient had diabetes, hypertension, or dehydration recently?",
+      "Any medication changes that could affect kidney function?",
+    ];
+  }
+
+  if (overallRisk === "HIGH") {
+    return [
+      "When did the symptoms begin and how quickly are they changing?",
+      "What background conditions or medications could be contributing?",
+      "Are there any red-flag symptoms that require urgent care?",
+    ];
+  }
+
+  return [
+    "What symptoms or concerns prompted this scan?",
+    "Have any related measurements changed recently?",
+    "Is there a family history or prior diagnosis that could explain the findings?",
+  ];
+}
 
 export default function ResultsPage() {
   const router = useRouter();
@@ -26,6 +157,10 @@ export default function ResultsPage() {
   useEffect(() => {
     const hydrateResult = async () => {
       if (resultId) {
+        if (currentAnalysis?.id === resultId) {
+          return;
+        }
+
         setLoadingResult(true);
         await openHistoryItem(resultId);
         setLoadingResult(false);
@@ -38,17 +173,23 @@ export default function ResultsPage() {
     };
 
     void hydrateResult();
-  }, [currentAnalysis, history, openHistoryItem, resultId, setCurrentAnalysis]);
+  }, [currentAnalysis?.id, history, openHistoryItem, resultId, setCurrentAnalysis]);
 
   const activeAnalysis = currentAnalysis;
+  const detectedModels = activeAnalysis?.response.selected_models || [];
+  const autismFocused = isAutismFocused(detectedModels);
 
   const orderedModels = useMemo(() => {
     if (!activeAnalysis) {
       return CORE_MODELS;
     }
 
-    return Array.from(new Set([...CORE_MODELS, ...activeAnalysis.response.selected_models]));
-  }, [activeAnalysis]);
+    if (autismFocused) {
+      return detectedModels.filter((modelName) => AUTISM_MODELS.includes(modelName));
+    }
+
+    return Array.from(new Set([...CORE_MODELS, ...detectedModels]));
+  }, [activeAnalysis, autismFocused, detectedModels]);
 
   if (loadingResult) {
     return (
@@ -76,6 +217,21 @@ export default function ResultsPage() {
 
   const { response } = activeAnalysis;
   const progressValue = riskProgressValue(response.final_assessment.overall_risk);
+  const detectedCondition = getDetectedCondition(detectedModels, response.final_assessment.overall_risk);
+  const clinicalSummary = buildClinicalSummary(
+    detectedModels,
+    response.final_assessment.overall_risk,
+    response.final_decision
+  );
+  const recommendations = buildRecommendations(
+    detectedModels,
+    response.final_assessment.overall_risk,
+    response.final_decision
+  );
+  const followUpQuestions = buildFollowUpQuestions(detectedModels, response.final_assessment.overall_risk);
+  const filteredRagContext = autismFocused
+    ? response.rag_context.filter((item) => item.toLowerCase().includes("autism_spectrum_disorder"))
+    : response.rag_context;
 
   const downloadJSON = () => {
     const blob = new Blob([JSON.stringify(activeAnalysis, null, 2)], { type: "application/json" });
@@ -142,6 +298,39 @@ export default function ResultsPage() {
         </article>
       </div>
 
+      <article className="rounded-2xl border border-cyan-200 bg-gradient-to-br from-cyan-50 via-white to-sky-50 p-6 shadow-sm">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-700">Clinical Impression</p>
+            <h2 className="mt-1 text-2xl font-semibold text-slate-900">{detectedCondition}</h2>
+          </div>
+          <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${priorityBadgeClass(response.final_assessment.priority)}`}>
+            {response.final_assessment.priority} priority
+          </span>
+        </div>
+
+        <p className="mt-4 max-w-4xl text-sm leading-6 text-slate-700">{clinicalSummary}</p>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl border border-slate-200 bg-white/80 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Selected Models</p>
+            <p className="mt-2 text-sm font-semibold text-slate-900">
+              {response.selected_models.length > 0
+                ? response.selected_models.map((modelName) => formatModelName(modelName)).join(", ")
+                : "None"}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white/80 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Gateway Confidence</p>
+            <p className="mt-2 text-sm font-semibold text-slate-900">{formatConfidence(response.results[detectedModels[0] || ""]?.confidence || 0.9)}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white/80 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Decision</p>
+            <p className="mt-2 text-sm font-semibold text-slate-900">{response.final_decision || "STANDARD_MONITORING"}</p>
+          </div>
+        </div>
+      </article>
+
       <article className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
         <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
           <span>Risk Visualization</span>
@@ -175,6 +364,67 @@ export default function ResultsPage() {
           <p className="mt-3 text-sm text-slate-500">No explanation provided for this analysis run.</p>
         )}
       </article>
+
+      {filteredRagContext.length > 0 ? (
+        <article className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-900">Supporting Clinical Evidence</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Retrieved clinical references and background evidence used to support the analysis.
+          </p>
+          <ul className="mt-3 space-y-2 text-sm text-slate-700">
+            {filteredRagContext.map((item, index) => (
+              <li key={`${item}-${index}`} className="rounded-lg bg-slate-50 px-3 py-2">
+                {item}
+              </li>
+            ))}
+          </ul>
+        </article>
+      ) : null}
+
+      <article className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
+        <h2 className="text-lg font-semibold text-slate-900">Recommendations</h2>
+        <ul className="mt-3 space-y-2 text-sm text-slate-700">
+          {recommendations.map((recommendation, index) => (
+            <li key={`${recommendation}-${index}`} className="rounded-lg bg-slate-50 px-3 py-2">
+              {recommendation}
+            </li>
+          ))}
+        </ul>
+      </article>
+
+      <article className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
+        <h2 className="text-lg font-semibold text-slate-900">Follow-up Questions</h2>
+        <p className="mt-1 text-sm text-slate-600">Use these questions to understand possible causes and context for the detected pattern.</p>
+        <ol className="mt-3 space-y-2 text-sm text-slate-700">
+          {followUpQuestions.map((question, index) => (
+            <li key={`${question}-${index}`} className="rounded-lg bg-slate-50 px-3 py-2">
+              <span className="mr-2 font-semibold text-cyan-700">Q{index + 1}.</span>
+              {question}
+            </li>
+          ))}
+        </ol>
+      </article>
+
+      {response.kg_insights.connections.length > 0 ? (
+        <article className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-900">Knowledge Graph Insights</h2>
+          <p className="mt-3 text-sm text-slate-700">{response.kg_insights.connections.slice(0, 10).join(" • ")}</p>
+        </article>
+      ) : null}
+
+      {response.llm_explanation_text ? (
+        <article className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-900">LLM Explanation</h2>
+          <p className="mt-3 text-sm text-slate-700">{response.llm_explanation_text}</p>
+        </article>
+      ) : null}
+
+      {response.final_decision ? (
+        <article className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-900">Final Decision</h2>
+          <p className="mt-3 text-sm font-semibold text-cyan-700">{response.final_decision}</p>
+        </article>
+      ) : null}
 
       <article className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
         <h2 className="text-lg font-semibold text-slate-900">Metadata</h2>

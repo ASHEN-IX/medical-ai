@@ -2,14 +2,19 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-
 import { useAIAnalysis } from "@/hooks/useAIAnalysis";
 import type { RiskLevel } from "@/services/api";
-import { formatDateTime } from "@/utils/formatters";
+
+const RISK_COLORS: Record<string, string> = {
+  LOW: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
+  MEDIUM: "border-yellow-500/30 bg-yellow-500/10 text-yellow-300",
+  HIGH: "border-red-500/30 bg-red-500/10 text-red-300",
+  CRITICAL: "border-red-500/50 bg-red-500/20 text-red-200 animate-pulse",
+};
 
 export default function HistoryPage() {
   const router = useRouter();
-  const { history, refreshHistory } = useAIAnalysis();
+  const { history, refreshHistory, setCurrentAnalysis } = useAIAnalysis();
 
   const [dateFilter, setDateFilter] = useState("");
   const [riskFilter, setRiskFilter] = useState<RiskLevel | "ALL">("ALL");
@@ -20,90 +25,109 @@ export default function HistoryPage() {
 
   const filteredHistory = useMemo(() => {
     return history.filter((entry) => {
-      const createdDate = entry.createdAt.slice(0, 10);
-      const overallRisk = entry.response.final_assessment.overall_risk;
-
+      const createdDate = entry.createdAt?.slice(0, 10) || "";
+      const risk = entry.riskLevel || "LOW";
       const dateMatches = !dateFilter || createdDate === dateFilter;
-      const riskMatches = riskFilter === "ALL" || riskFilter === overallRisk;
-
+      const riskMatches = riskFilter === "ALL" || riskFilter === risk;
       return dateMatches && riskMatches;
     });
   }, [dateFilter, history, riskFilter]);
 
+  const handleOpen = (entry: typeof history[0]) => {
+    setCurrentAnalysis(entry);
+    router.push(`/results?id=${entry.id}`);
+  };
+
   return (
     <section className="mx-auto max-w-6xl space-y-6">
-      <div className="rounded-3xl border border-slate-200/80 bg-white/80 p-6 shadow-xl shadow-cyan-100/30 backdrop-blur">
-        <h1 className="text-3xl font-semibold text-slate-900">Analysis History</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Review previous AI runs and reopen full clinical intelligence responses.
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl">
+        <h1 className="text-3xl font-bold text-white">Analysis History</h1>
+        <p className="mt-1 text-sm text-white/60">
+          Review past AI analyses and track your health over time.
         </p>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:w-[420px]">
           <label className="space-y-1.5">
-            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Filter by date</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-white/50">Filter by date</span>
             <input
               type="date"
               value={dateFilter}
-              onChange={(event) => setDateFilter(event.target.value)}
-              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
+              onChange={(e) => setDateFilter(e.target.value)}
+              className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/30"
             />
           </label>
 
           <label className="space-y-1.5">
-            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Filter by risk</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-white/50">Filter by risk</span>
             <select
               value={riskFilter}
-              onChange={(event) => setRiskFilter(event.target.value as RiskLevel | "ALL")}
-              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
+              onChange={(e) => setRiskFilter(e.target.value as RiskLevel | "ALL")}
+              className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/30"
             >
-              <option value="ALL">ALL</option>
-              <option value="LOW">LOW</option>
-              <option value="MEDIUM">MEDIUM</option>
-              <option value="HIGH">HIGH</option>
+              <option value="ALL" className="bg-slate-900">All Levels</option>
+              <option value="LOW" className="bg-slate-900">Low</option>
+              <option value="MEDIUM" className="bg-slate-900">Medium</option>
+              <option value="HIGH" className="bg-slate-900">High</option>
+              <option value="CRITICAL" className="bg-slate-900">Critical</option>
             </select>
           </label>
         </div>
       </div>
 
       {filteredHistory.length === 0 ? (
-        <div className="rounded-2xl border border-slate-200 bg-white/80 p-8 text-center shadow-sm">
-          <p className="text-sm text-slate-600">No historical analysis matched your filters.</p>
+        <div className="rounded-2xl border border-dashed border-white/15 bg-white/5 p-12 text-center backdrop-blur-xl">
+          <p className="text-white/60">No analyses match your filters.</p>
           <button
             type="button"
             onClick={() => router.push("/upload")}
-            className="mt-4 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-700"
+            className="mt-4 rounded-lg bg-cyan-600/30 border border-cyan-500/30 px-5 py-2 text-sm font-semibold text-cyan-200 transition hover:bg-cyan-500/40"
           >
             Run New Analysis
           </button>
         </div>
       ) : (
         <div className="space-y-3">
-          {filteredHistory.map((entry) => (
-            <button
-              type="button"
-              key={entry.id}
-              onClick={() => router.push(`/results?id=${entry.id}`)}
-              className="w-full rounded-2xl border border-slate-200 bg-white/85 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-cyan-300 hover:shadow-md"
-            >
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-slate-800">{formatDateTime(entry.createdAt)}</p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Models: {entry.response.selected_models.join(", ") || "none"}
-                  </p>
-                </div>
+          {filteredHistory.map((entry) => {
+            const risk = entry.riskLevel || "LOW";
+            const riskClass = RISK_COLORS[risk] || RISK_COLORS.LOW;
 
-                <div className="flex items-center gap-2">
-                  <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
-                    Risk: {entry.response.final_assessment.overall_risk}
-                  </span>
-                  <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
-                    Priority: {entry.response.final_assessment.priority}
-                  </span>
+            return (
+              <button
+                type="button"
+                key={entry.id}
+                onClick={() => handleOpen(entry)}
+                className="w-full rounded-2xl border border-white/10 bg-white/5 p-5 text-left backdrop-blur-xl transition hover:border-white/20 hover:bg-white/10"
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="space-y-1">
+                    <p className="text-lg font-semibold text-white">{entry.testName || "Analysis"}</p>
+                    <p className="text-xs text-white/50">
+                      {new Date(entry.createdAt).toLocaleString()} | Models: {entry.selectedModels?.join(", ") || "auto"}
+                    </p>
+                    {entry.keyFindings?.length > 0 && (
+                      <p className="text-sm text-white/70 line-clamp-1">{entry.keyFindings[0]}</p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    {entry.healthScore != null && (
+                      <span className="rounded-lg border border-white/10 bg-white/10 px-3 py-1 text-sm font-bold text-white">
+                        Score: {entry.healthScore}
+                      </span>
+                    )}
+                    <span className={`rounded-lg border px-3 py-1 text-xs font-bold ${riskClass}`}>
+                      {risk}
+                    </span>
+                    {entry.status === "REVIEWED" && (
+                      <span className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-300">
+                        Reviewed
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </button>
-          ))}
+              </button>
+            );
+          })}
         </div>
       )}
     </section>

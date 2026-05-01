@@ -31,6 +31,8 @@ class AutismDLPredictionResult(BaseModel):
 
 
 class Metadata(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     model_version: str
     processing_time_ms: int
     timestamp: datetime
@@ -45,6 +47,8 @@ class AutismDLResponse(BaseModel):
 
 
 class ImageInput(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     image: str = Field(..., description="Base64 encoded image string")
     image_format: Literal["png", "jpg", "jpeg"] = "png"
     model_version: str = "v1.0"
@@ -81,19 +85,19 @@ class SurveyResponses(BaseModel):
 class Demographics(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    gender: Literal["m", "f"]
+    gender: int | Literal["m", "f"]
     age: Optional[int] = Field(default=None, ge=0, le=120)
-    ethnicity: Optional[str] = None
-    jaundice: Optional[str] = None
-    relation: Optional[str] = None
+    ethnicity: Optional[str | int] = None
+    jaundice: Optional[str | int] = None
+    relation: Optional[str | int] = None
 
     # Optional fields from the training schema.
-    austim: Optional[str] = None
-    contry_of_res: Optional[str] = Field(
+    austim: Optional[str | int] = None
+    contry_of_res: Optional[str | int] = Field(
         default=None,
         validation_alias=AliasChoices("contry_of_res", "country_of_res"),
     )
-    used_app_before: Optional[str] = None
+    used_app_before: Optional[str | int] = None
     result: Optional[float] = None
 
 
@@ -149,6 +153,55 @@ class KidneyDiseasePredictionResult(BaseModel):
 class KidneyDiseaseResponse(BaseModel):
     success: bool = True
     prediction: KidneyDiseasePredictionResult
+    recommendations: List[str]
+    metadata: Metadata
+    request_id: str
+
+
+class DiabetesRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    pregnancies: int = Field(..., ge=0, le=20, validation_alias=AliasChoices("pregnancies", "Pregnancies"))
+    glucose: float = Field(..., ge=0, le=250, validation_alias=AliasChoices("glucose", "Glucose"))
+    blood_pressure: float = Field(
+        ...,
+        ge=0,
+        le=140,
+        validation_alias=AliasChoices("blood_pressure", "BloodPressure"),
+    )
+    skin_thickness: float = Field(
+        ...,
+        ge=0,
+        le=100,
+        validation_alias=AliasChoices("skin_thickness", "SkinThickness"),
+    )
+    insulin: float = Field(..., ge=0, le=900, validation_alias=AliasChoices("insulin", "Insulin"))
+    bmi: float = Field(..., ge=0, le=70, validation_alias=AliasChoices("bmi", "BMI"))
+    diabetes_pedigree_function: float = Field(
+        ...,
+        ge=0,
+        le=3,
+        validation_alias=AliasChoices("diabetes_pedigree_function", "DiabetesPedigreeFunction"),
+    )
+    age: int = Field(..., ge=1, le=120, validation_alias=AliasChoices("age", "Age"))
+
+
+class DiabetesClassProbabilities(BaseModel):
+    diabetic: float
+    non_diabetic: float
+
+
+class DiabetesPredictionResult(BaseModel):
+    diabetic: bool
+    risk_level: Literal["LOW", "MEDIUM", "HIGH"]
+    confidence_score: float
+    diabetes_probability: float
+    class_probabilities: DiabetesClassProbabilities
+
+
+class DiabetesResponse(BaseModel):
+    success: bool = True
+    prediction: DiabetesPredictionResult
     recommendations: List[str]
     metadata: Metadata
     request_id: str
