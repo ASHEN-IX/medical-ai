@@ -106,6 +106,9 @@ model Analysis {
   user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   reportId       String?
   report         MedicalReport? @relation(fields: [reportId], references: [id], onDelete: SetNull)
+  request        Json?
+  response       Json?
+  followUpAnswers Json?
   testName       String
   selectedModels String[]
   features       Json

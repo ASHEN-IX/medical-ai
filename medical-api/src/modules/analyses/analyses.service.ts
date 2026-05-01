@@ -11,6 +11,15 @@ export interface AnalysisResult {
   id: string;
   userId: string;
   reportId: string | null;
+  request?: Record<string, unknown> | null;
+  response?: Record<string, unknown> | null;
+  followUpAnswers?: Record<string, string> | null;
+  patient?: {
+    id: string;
+    name: string;
+    email: string;
+    role: UserRole;
+  };
   testName: string;
   selectedModels: string[];
   features: Record<string, number>;
@@ -44,6 +53,8 @@ export class AnalysesService {
       keyFindings?: string[];
       aiInsights?: string;
       reportId?: string;
+      request?: Record<string, unknown>;
+      response?: Record<string, unknown>;
     },
   ): Promise<AnalysisResult> {
     const analysis = await this.prisma.analysis.create({
@@ -60,7 +71,9 @@ export class AnalysesService {
         keyFindings: data.keyFindings || [],
         aiInsights: data.aiInsights || null,
         status: 'COMPLETED',
-      },
+        request: data.request as any,
+        response: data.response as any,
+      } as any,
     });
 
     this.logger.log(`Analysis created: ${analysis.id} for user ${userId}`);
@@ -149,6 +162,48 @@ export class AnalysesService {
     return analyses.map((a) => this.mapAnalysis(a));
   }
 
+  async getAllAnalysesForDoctor(
+    userRole: UserRole,
+    filters: {
+      search?: string;
+      riskLevel?: string;
+      status?: string;
+      patientId?: string;
+    },
+  ): Promise<AnalysisResult[]> {
+    if (userRole !== UserRole.DOCTOR && userRole !== UserRole.ADMIN) {
+      throw new ForbiddenException('Only doctors and admins can access this view');
+    }
+
+    const analyses = await this.prisma.analysis.findMany({
+      where: {
+        ...(filters.patientId ? { userId: filters.patientId } : {}),
+        ...(filters.riskLevel ? { riskLevel: filters.riskLevel as any } : {}),
+        ...(filters.status ? { status: filters.status as any } : {}),
+        ...(filters.search
+          ? {
+              OR: [
+                { testName: { contains: filters.search, mode: 'insensitive' } },
+                { user: { name: { contains: filters.search, mode: 'insensitive' } } },
+                { user: { email: { contains: filters.search, mode: 'insensitive' } } },
+              ],
+            }
+          : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        user: { select: { id: true, name: true, email: true, role: true } },
+        doctorReviews: {
+          include: {
+            doctor: { select: { id: true, name: true } },
+          },
+        },
+      },
+    });
+
+    return analyses.map((a) => this.mapAnalysis(a));
+  }
+
   async updateAnalysis(
     analysisId: string,
     userId: string,
@@ -156,6 +211,14 @@ export class AnalysesService {
     data: Partial<{
       testName: string;
       results: Record<string, { risk: string; confidence: number }>;
+      healthScore: number;
+      riskLevel: string;
+      keyFindings: string[];
+      aiInsights: string;
+      status: string;
+      followUpAnswers: Record<string, string>;
+      request: Record<string, unknown>;
+      response: Record<string, unknown>;
     }>,
   ): Promise<AnalysisResult> {
     const analysis = await this.prisma.analysis.findUnique({
@@ -174,7 +237,7 @@ export class AnalysesService {
 
     const updated = await this.prisma.analysis.update({
       where: { id: analysisId },
-      data,
+      data: data as any,
     });
 
     this.logger.log(`Analysis updated: ${analysisId}`);
@@ -229,6 +292,17 @@ export class AnalysesService {
       id: analysis.id,
       userId: analysis.userId,
       reportId: analysis.reportId || null,
+      request: analysis.request || null,
+      response: analysis.response || null,
+      followUpAnswers: analysis.followUpAnswers || null,
+      patient: analysis.user
+        ? {
+            id: analysis.user.id,
+            name: analysis.user.name,
+            email: analysis.user.email,
+            role: analysis.user.role,
+          }
+        : undefined,
       testName: analysis.testName,
       selectedModels: analysis.selectedModels || [],
       features: analysis.features || {},
