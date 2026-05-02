@@ -11,6 +11,7 @@ import { fetchUnreadCount } from "@/services/api";
 
 const patientNav = [
   { href: "/upload", label: "Upload" },
+  { href: "/diagnosis", label: "Diagnosis" },
   { href: "/results", label: "Results" },
   { href: "/history", label: "History" },
   { href: "/timeline", label: "Timeline" },

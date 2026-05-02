@@ -227,10 +227,6 @@ class GatewayService:
         except RAGClientError as exc:
             logger.warning("RAG context unavailable request_id=%s error=%s", request_id, exc)
             return []
-            return await asyncio.to_thread(self.rag_client.retrieve_context, rag_query, 3)
-        except RAGClientError as exc:
-            logger.warning("RAG context unavailable request_id=%s error=%s", request_id, exc)
-            return []
         except MedicalRagServiceError as exc:
             logger.warning("RAG context unavailable request_id=%s error=%s", request_id, exc)
             return []

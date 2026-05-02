@@ -201,29 +201,6 @@ export async function analyzeReportDirect(payload: AnalyzeReportPayload): Promis
   }
 }
 
-export interface ManualModelRunResponse {
-  success: boolean;
-  results: Record<string, { risk: string; confidence: number }>;
-  details?: Record<string, unknown>;
-  failures?: Record<string, string>;
-}
-
-export async function runManualModels(
-  selectedModels: string[],
-  payload: Partial<AnalyzeReportPayload>
-): Promise<ManualModelRunResponse> {
-  try {
-    const { data } = await aiGatewayApi.post<ManualModelRunResponse>("/api/v1/ai/run-model", {
-      selected_models: selectedModels,
-      ...payload,
-    });
-
-    return data;
-  } catch (error) {
-    throw normalizeError(error);
-  }
-}
-
 export async function processReportFile(file: File): Promise<ProcessReportResponse> {
   try {
     const formData = new FormData();
@@ -250,6 +227,127 @@ export async function runManualModels(
     return data;
   } catch (error) {
     throw normalizeError(error);
+  }
+}
+
+// --- Staged Diagnosis (two-phase follow-up workflow) ---
+
+export interface FollowUpQuestion {
+  id: string;
+  text: string;
+  disease: string;
+  category: string;
+  reason: string;
+  answer_type: "free_text" | "yes_no" | "scale" | "multiple_choice";
+  options: string[];
+  priority: number;
+  kg_source?: string;
+  rag_source?: string;
+}
+
+export interface PatientAnswer {
+  question_id: string;
+  answer: string;
+}
+
+export type SessionStage = "initial_analysis" | "follow_up_pending" | "answers_submitted" | "final_report_ready";
+
+export interface StagedAnalyzeResponse {
+  success: boolean;
+  session_id: string;
+  stage: SessionStage;
+  report_type: string;
+  selected_disease?: string;
+  overall_risk: RiskLevel;
+  confidence: number;
+  model_outputs: Record<string, unknown>;
+  needs_follow_up: boolean;
+  follow_up_questions: FollowUpQuestion[];
+  reasoning: string[];
+  rag_context: string[];
+  kg_insights: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+}
+
+export interface FetchQuestionsResponse {
+  success: boolean;
+  session_id: string;
+  stage: SessionStage;
+  selected_disease?: string;
+  questions: FollowUpQuestion[];
+  question_count: number;
+}
+
+export interface SubmitAnswersResponse {
+  success: boolean;
+  session_id: string;
+  stage: SessionStage;
+  enriched_features: Record<string, unknown>;
+  feature_count: number;
+}
+
+export interface FinalReportResponse {
+  success: boolean;
+  session_id: string;
+  stage: SessionStage;
+  report_type: string;
+  selected_disease?: string;
+  updated_risk: RiskLevel;
+  updated_confidence: number;
+  model_outputs: Record<string, unknown>;
+  evidence_summary: string[];
+  missing_caveats: string[];
+  recommendations: string[];
+  llm_narrative: string;
+  initial_vs_final: {
+    initial_risk: RiskLevel;
+    final_risk: RiskLevel;
+    initial_confidence: number;
+    final_confidence: number;
+    risk_changed: boolean;
+    confidence_delta: number;
+  };
+  safety_note: string;
+  metadata: Record<string, unknown>;
+}
+
+export async function stagedAnalyze(payload: AnalyzeReportPayload): Promise<StagedAnalyzeResponse> {
+  try {
+    const { data } = await apiClient.post<StagedAnalyzeResponse>("/ai/diagnosis/analyze", payload);
+    return data;
+  } catch {
+    const { data } = await aiGatewayApi.post<StagedAnalyzeResponse>("/api/v1/diagnosis/analyze", payload);
+    return data;
+  }
+}
+
+export async function fetchFollowUpQuestions(sessionId: string): Promise<FetchQuestionsResponse> {
+  try {
+    const { data } = await apiClient.post<FetchQuestionsResponse>("/ai/diagnosis/questions", { session_id: sessionId });
+    return data;
+  } catch {
+    const { data } = await aiGatewayApi.post<FetchQuestionsResponse>("/api/v1/diagnosis/questions", { session_id: sessionId });
+    return data;
+  }
+}
+
+export async function submitFollowUpAnswers(sessionId: string, answers: PatientAnswer[]): Promise<SubmitAnswersResponse> {
+  try {
+    const { data } = await apiClient.post<SubmitAnswersResponse>("/ai/diagnosis/answers", { session_id: sessionId, answers });
+    return data;
+  } catch {
+    const { data } = await aiGatewayApi.post<SubmitAnswersResponse>("/api/v1/diagnosis/answers", { session_id: sessionId, answers });
+    return data;
+  }
+}
+
+export async function generateFinalReport(sessionId: string): Promise<FinalReportResponse> {
+  try {
+    const { data } = await apiClient.post<FinalReportResponse>("/ai/diagnosis/final-report", { session_id: sessionId });
+    return data;
+  } catch {
+    const { data } = await aiGatewayApi.post<FinalReportResponse>("/api/v1/diagnosis/final-report", { session_id: sessionId });
+    return data;
   }
 }
 
