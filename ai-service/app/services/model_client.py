@@ -43,6 +43,7 @@ class ModelClient:
         "stroke": ["/api/v1/stroke/predict", "/api/v1/stroke-risk/predict"],
         "autism_dl": ["/api/v1/autism-dl/predict"],
         "autism_pred": ["/api/v1/autism-pred/predict"],
+        "liver": ["/api/v1/liver-disease/predict", "/api/v1/liver/predict"],
     }
 
     KIDNEY_DEFAULT_PAYLOAD = {
