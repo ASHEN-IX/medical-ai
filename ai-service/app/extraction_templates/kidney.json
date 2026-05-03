@@ -1,0 +1,39 @@
+{
+  "_template": "kidney",
+  "_description": "Chronic Kidney Disease (CKD) model. Core clinical/lab features. Derived features are computed automatically.",
+  "_field_notes": {
+    "age":   "Patient age in years (float)",
+    "hemo":  "Hemoglobin level in g/dL (float) — key indicator",
+    "sg":    "Urine specific gravity (float, e.g. 1.020)",
+    "al":    "Albumin in urine — graded 0-5 (integer)",
+    "pcv":   "Packed cell volume / hematocrit % (float)",
+    "sc":    "Serum creatinine in mg/dL (float) — key indicator",
+    "htn":   "Hypertension: 1=Yes 0=No (integer)"
+  },
+  "_derived_auto": {
+    "bp":   "Blood pressure mmHg (default 120)",
+    "bgr":  "Blood glucose random mg/dL (default 100)",
+    "bu":   "Blood urea in mg/dL (default 25)",
+    "sod":  "Sodium mEq/L (default 138)",
+    "pot":  "Potassium mEq/L (default 4.5)",
+    "wc":   "White blood cell count (default 1)",
+    "rc":   "Red blood cell count (default 4.5)",
+    "su":   "Sugar in urine 0-5 (default 0)",
+    "rbc":  "RBC in urine 1=normal 0=abnormal (default 1)",
+    "pc":   "Pus cell 1=normal 0=abnormal (default 1)",
+    "pcc":  "Pus cell clumps 1=present 0=not (default 0)",
+    "ba":   "Bacteria 1=present 0=not (default 0)",
+    "dm":   "Diabetes mellitus 1=yes 0=no (default 0)",
+    "cad":  "Coronary artery disease 1=yes 0=no (default 0)",
+    "appet":"Appetite 1=good 0=poor (default 1)",
+    "pe":   "Pedal edema 1=yes 0=no (default 0)",
+    "ane":  "Anaemia 1=yes 0=no (default 0)"
+  },
+  "age": 0.0,
+  "hemo": 0.0,
+  "sg": 0.0,
+  "al": 0,
+  "pcv": 0.0,
+  "sc": 0.0,
+  "htn": 0
+}

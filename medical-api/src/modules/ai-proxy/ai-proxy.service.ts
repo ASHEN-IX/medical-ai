@@ -16,7 +16,16 @@ export interface AiAnalyzeResponse {
   success: boolean;
   request_id: string;
   extracted_features: Record<string, unknown>;
-  model_outputs: Record<string, { risk: string; confidence: number; source?: string }>;
+  model_outputs: Record<
+    string,
+    {
+      risk: string;
+      confidence: number;
+      source?: string;
+      autism_detected?: boolean;
+      raw_response?: Record<string, unknown>;
+    }
+  >;
   rag_context: string[];
   kg_insights: {
     diseases: string[];
@@ -35,7 +44,7 @@ export interface AiAnalyzeResponse {
   llm_explanation_text: string;
   final_decision: string;
   selected_models: string[];
-  results: Record<string, { risk: string; confidence: number }>;
+  results: Record<string, { risk: string; confidence: number; autism_detected?: boolean }>;
   final_assessment: { overall_risk: string; priority: string };
   reasoning: string[];
   llm_explanation?: {
@@ -52,6 +61,95 @@ export interface AiChatPayload {
   message: string;
   analysis_context?: Record<string, unknown>;
   history?: Array<{ role: string; content: string }>;
+}
+
+export interface StagedAnalyzePayload {
+  report_type: string;
+  features: Record<string, number | string | null | undefined>;
+  raw_text?: string;
+  include_explanation?: boolean;
+  symptoms?: string[];
+  image?: string;
+}
+
+export interface FollowUpQuestion {
+  id: string;
+  text: string;
+  disease: string;
+  category: string;
+  reason: string;
+  answer_type: string;
+  options: string[];
+  priority: number;
+  kg_source?: string;
+  rag_source?: string;
+}
+
+export interface StagedAnalyzeResponse {
+  success: boolean;
+  session_id: string;
+  stage: string;
+  report_type: string;
+  selected_disease?: string;
+  overall_risk: string;
+  confidence: number;
+  model_outputs: Record<string, unknown>;
+  needs_follow_up: boolean;
+  follow_up_questions: FollowUpQuestion[];
+  reasoning: string[];
+  rag_context: string[];
+  kg_insights: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+}
+
+export interface FetchQuestionsPayload {
+  session_id: string;
+}
+
+export interface FetchQuestionsResponse {
+  success: boolean;
+  session_id: string;
+  stage: string;
+  selected_disease?: string;
+  questions: FollowUpQuestion[];
+  question_count: number;
+}
+
+export interface SubmitAnswersPayload {
+  session_id: string;
+  answers: Array<{ question_id: string; answer: string }>;
+}
+
+export interface SubmitAnswersResponse {
+  success: boolean;
+  session_id: string;
+  stage: string;
+  enriched_features: Record<string, unknown>;
+  feature_count: number;
+}
+
+export interface FinalReportPayload {
+  session_id: string;
+}
+
+export interface FinalReportResponse {
+  success: boolean;
+  session_id: string;
+  stage: string;
+  report_type: string;
+  selected_disease?: string;
+  updated_risk: string;
+  updated_confidence: number;
+  model_outputs: Record<string, unknown>;
+  rag_context: string[];
+  kg_insights: Record<string, unknown>;
+  evidence_summary: string[];
+  missing_caveats: string[];
+  recommendations: string[];
+  llm_narrative: string;
+  initial_vs_final: Record<string, unknown>;
+  safety_note: string;
+  metadata: Record<string, unknown>;
 }
 
 export interface AiChatResponse {
@@ -88,6 +186,7 @@ export class AiProxyService {
       );
       const healthScore = this.calculateHealthScore(data);
       const keyFindings = this.extractKeyFindings(data);
+      const storedResults = this.persistCanonicalAutismFlag(data);
 
       const analysis = await this.prisma.analysis.create({
         data: {
@@ -96,7 +195,7 @@ export class AiProxyService {
           selectedModels: data.selected_models || [],
           features: payload.features || {},
           symptoms: payload.symptoms || [],
-          results: data.results || {},
+          results: storedResults,
           healthScore,
           riskLevel,
           keyFindings,
@@ -189,6 +288,106 @@ export class AiProxyService {
     return { metrics: grouped, analyses, insights };
   }
 
+  async stagedAnalyze(
+    userId: string,
+    payload: StagedAnalyzePayload,
+  ): Promise<StagedAnalyzeResponse> {
+    try {
+      const { data } = await this.aiClient.post<StagedAnalyzeResponse>(
+        '/api/v1/diagnosis/analyze',
+        payload,
+      );
+
+      await this.prisma.log.create({
+        data: {
+          userId,
+          action: 'STAGED_DIAGNOSIS_STARTED',
+          metadata: {
+            sessionId: data.session_id,
+            disease: data.selected_disease,
+            risk: data.overall_risk,
+            needsFollowUp: data.needs_follow_up,
+            questionCount: data.follow_up_questions?.length ?? 0,
+          },
+        },
+      });
+
+      return data;
+    } catch (error) {
+      this.logger.error('Staged analysis failed', error);
+      throw new InternalServerErrorException(
+        'AI staged analysis is temporarily unavailable. Please try again.',
+      );
+    }
+  }
+
+  async fetchQuestions(
+    payload: FetchQuestionsPayload,
+  ): Promise<FetchQuestionsResponse> {
+    try {
+      const { data } = await this.aiClient.post<FetchQuestionsResponse>(
+        '/api/v1/diagnosis/questions',
+        payload,
+      );
+      return data;
+    } catch (error) {
+      this.logger.error('Fetch questions failed', error);
+      throw new InternalServerErrorException(
+        'Could not fetch follow-up questions.',
+      );
+    }
+  }
+
+  async submitAnswers(
+    payload: SubmitAnswersPayload,
+  ): Promise<SubmitAnswersResponse> {
+    try {
+      const { data } = await this.aiClient.post<SubmitAnswersResponse>(
+        '/api/v1/diagnosis/answers',
+        payload,
+      );
+      return data;
+    } catch (error) {
+      this.logger.error('Submit answers failed', error);
+      throw new InternalServerErrorException(
+        'Could not submit answers.',
+      );
+    }
+  }
+
+  async generateFinalReport(
+    userId: string,
+    payload: FinalReportPayload,
+  ): Promise<FinalReportResponse> {
+    try {
+      const { data } = await this.aiClient.post<FinalReportResponse>(
+        '/api/v1/diagnosis/final-report',
+        payload,
+      );
+
+      await this.prisma.log.create({
+        data: {
+          userId,
+          action: 'STAGED_DIAGNOSIS_COMPLETED',
+          metadata: {
+            sessionId: data.session_id,
+            disease: data.selected_disease,
+            updatedRisk: data.updated_risk,
+            updatedConfidence: data.updated_confidence,
+            initialVsFinal: data.initial_vs_final || {},
+          } as any,
+        },
+      });
+
+      return data;
+    } catch (error) {
+      this.logger.error('Final report generation failed', error);
+      throw new InternalServerErrorException(
+        'Could not generate final report.',
+      );
+    }
+  }
+
   private calculateHealthScore(response: AiAnalyzeResponse): number {
     const results = response.results || {};
     const confidences = Object.values(results);
@@ -202,6 +401,23 @@ export class AiProxyService {
     }
 
     return Math.max(0, Math.min(100, Math.round(score)));
+  }
+
+  private persistCanonicalAutismFlag(response: AiAnalyzeResponse): Record<string, unknown> {
+    const results = { ...(response.results || {}) } as Record<string, any>;
+    const autismModel = response.model_outputs?.autism_pred || response.model_outputs?.autism_dl;
+    const autismDetected = autismModel?.raw_response?.prediction?.autism_detected;
+
+    if (typeof autismDetected === 'boolean') {
+      const autismKey = response.model_outputs?.autism_pred ? 'autism_pred' : 'autism_dl';
+      const existing = { ...(results[autismKey] || {}) };
+      results[autismKey] = {
+        ...existing,
+        autism_detected: autismDetected,
+      };
+    }
+
+    return results;
   }
 
   private extractKeyFindings(response: AiAnalyzeResponse): string[] {

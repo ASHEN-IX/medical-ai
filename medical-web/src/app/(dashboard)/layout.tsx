@@ -10,17 +10,16 @@ import { useAuth } from "@/hooks/useAuth";
 import { fetchUnreadCount } from "@/services/api";
 
 const patientNav = [
-  { href: "/upload", label: "Upload" },
+  { href: "/diagnosis", label: "Diagnosis" },
+  { href: "/upload", label: "Make your test" },
   { href: "/results", label: "Results" },
   { href: "/history", label: "History" },
-  { href: "/timeline", label: "Timeline" },
-  { href: "/chat", label: "AI Chat" },
 ];
 
 const doctorNav = [
   { href: "/doctor", label: "Queue" },
   { href: "/doctor/reviews", label: "Reviews" },
-  { href: "/upload", label: "Upload" },
+  { href: "/diagnosis", label: "Diagnosis" },
   { href: "/history", label: "History" },
 ];
 

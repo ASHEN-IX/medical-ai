@@ -44,7 +44,7 @@ export default function LoginPage() {
       setSuccess(true);
       const storedUser = localStorage.getItem("user");
       const role = storedUser ? JSON.parse(storedUser).role : "PATIENT";
-      const dest = role === "DOCTOR" || role === "ADMIN" ? "/doctor" : "/upload";
+      const dest = role === "DOCTOR" || role === "ADMIN" ? "/doctor" : "/diagnosis";
       setTimeout(() => {
         router.push(dest);
       }, 500);

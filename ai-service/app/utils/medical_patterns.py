@@ -44,6 +44,19 @@ HEART_MARKER_KEYWORDS = (
     "triglycerides",
 )
 
+AUTISM_MARKER_KEYWORDS = (
+    "autism",
+    "autism spectrum",
+    "asd",
+    "asperger",
+    "pdd",
+    "pervasive developmental",
+    "social communication disorder",
+    "sensory",
+    "repetitive behavior",
+    "atypical development",
+)
+
 DIABETES_MARKER_KEYWORDS = (
     "glucose",
     "blood sugar",

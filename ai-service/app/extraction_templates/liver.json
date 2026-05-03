@@ -1,0 +1,26 @@
+{
+  "_template": "liver",
+  "_description": "Indian Liver Patient Dataset (ILPD). Lab panel + demographics. All floats unless noted.",
+  "_field_notes": {
+    "age":                        "Patient age in years (integer)",
+    "gender":                     "Male or Female (string)",
+    "total_bilirubin":            "Total bilirubin level in mg/dL (float)",
+    "direct_bilirubin":           "Direct (conjugated) bilirubin in mg/dL (float)",
+    "alkaline_phosphotase":       "Alkaline phosphatase (ALP) in IU/L (integer/float)",
+    "alanine_aminotransferase":   "ALT / SGPT enzyme level in IU/L (integer/float)",
+    "aspartate_aminotransferase": "AST / SGOT enzyme level in IU/L (integer/float)",
+    "total_protiens":             "Total proteins in g/dL (float, optional — default 0)",
+    "albumin":                    "Albumin in g/dL (float)",
+    "albumin_and_globulin_ratio": "A/G ratio (float, optional — default 0)"
+  },
+  "age": 0,
+  "gender": "",
+  "total_bilirubin": 0.0,
+  "direct_bilirubin": 0.0,
+  "alkaline_phosphotase": 0.0,
+  "alanine_aminotransferase": 0.0,
+  "aspartate_aminotransferase": 0.0,
+  "total_protiens": 0.0,
+  "albumin": 0.0,
+  "albumin_and_globulin_ratio": 0.0
+}

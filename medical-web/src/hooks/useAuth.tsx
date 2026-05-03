@@ -1,5 +1,5 @@
 "use client";
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { apiClient } from "@/lib/apiClient";
 
@@ -42,19 +42,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const initRef = useRef(false);
 
   useEffect(() => {
-    try {
-      const raw = typeof window !== "undefined" ? localStorage.getItem("user") : null;
-      if (raw) setUser(JSON.parse(raw));
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
+    if (initRef.current) return;
+    initRef.current = true;
+
+    if (typeof window !== "undefined") {
+      try {
+        const raw = localStorage.getItem("user");
+        if (raw) setUser(JSON.parse(raw));
+      } catch {
+        // ignore
+      }
     }
+    setLoading(false);
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string) => {
     const { data } = await apiClient.post("/auth/login", { email, password });
     const token = data.access_token || data.accessToken || null;
     const u = data.user || null;
@@ -62,9 +67,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (token && typeof window !== "undefined") localStorage.setItem("accessToken", token);
     if (u && typeof window !== "undefined") localStorage.setItem("user", JSON.stringify(u));
     setUser(u);
-  };
+  }, []);
 
-  const register = async (regData: RegisterData) => {
+  const register = useCallback(async (regData: RegisterData) => {
     const { data } = await apiClient.post("/auth/register", regData);
     const token = data.access_token || data.accessToken || null;
     const u = data.user || null;
@@ -72,22 +77,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (token && typeof window !== "undefined") localStorage.setItem("accessToken", token);
     if (u && typeof window !== "undefined") localStorage.setItem("user", JSON.stringify(u));
     setUser(u);
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     if (typeof window !== "undefined") {
       localStorage.removeItem("accessToken");
       localStorage.removeItem("user");
     }
     setUser(null);
     router.push("/login");
-  };
+  }, [router]);
 
-  const isDoctor = user?.role === "DOCTOR" || user?.role === "ADMIN";
-  const isPatient = user?.role === "PATIENT";
+  const isDoctor = useMemo(() => user?.role === "DOCTOR" || user?.role === "ADMIN", [user?.role]);
+  const isPatient = useMemo(() => user?.role === "PATIENT", [user?.role]);
+
+  const value = useMemo(() => ({
+    user,
+    loading,
+    login,
+    register,
+    logout,
+    isDoctor,
+    isPatient,
+  }), [user, loading, login, register, logout, isDoctor, isPatient]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, isDoctor, isPatient }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

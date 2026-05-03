@@ -80,6 +80,7 @@ services:
       - GROQ_MODEL=${GROQ_MODEL:-openai/gpt-oss-120b}
       - SENTENCE_TRANSFORMERS_HOME=/data/sentence_transformers
       - OPENAI_API_KEY=${OPENAI_API_KEY:-sk-test-key}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-AIzaSyD5kzQNK3un8Mt4veMHUFxu0XBkAvJKRpQ}
       - NEO4J_URL=${NEO4J_URL:-bolt://neo4j:7687}
       - NEO4J_USERNAME=${NEO4J_USERNAME:-neo4j}
       - NEO4J_PASSWORD=${NEO4J_PASSWORD:-neo4j_password}

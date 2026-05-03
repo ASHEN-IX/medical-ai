@@ -1,0 +1,23 @@
+{
+  "_template": "stroke",
+  "_description": "Stroke risk prediction model. One-hot encoding for categorical fields is handled internally.",
+  "_field_notes": {
+    "age":               "Patient age in years (float)",
+    "hypertension":      "1=Has hypertension  0=No (integer)",
+    "heart_disease":     "1=Has heart disease 0=No (integer)",
+    "bmi":               "Body Mass Index (float)",
+    "avg_glucose_level": "Average blood glucose level in mg/dL (float)",
+    "ever_married":      "Yes or No (string)",
+    "work_type":         "Private | Self-employed | Govt_job | children | Never_worked (string)",
+    "smoking_status":    "never smoked | formerly smoked | smokes | Unknown (string)"
+  },
+  "_encoding_note": "ever_married, work_type, and smoking_status are one-hot encoded internally. Only the values above are valid.",
+  "age": 0.0,
+  "hypertension": 0,
+  "heart_disease": 0,
+  "bmi": 0.0,
+  "avg_glucose_level": 0.0,
+  "ever_married": "",
+  "work_type": "",
+  "smoking_status": ""
+}

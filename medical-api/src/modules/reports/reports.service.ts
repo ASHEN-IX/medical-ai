@@ -27,6 +27,25 @@ export class ReportsService {
       },
     });
 
+    // If we have extraction metadata from the AI service, save it to the new audit table
+    if (createReportDto.extractedData && createReportDto.extractedData.metadata) {
+      const { metadata, report_type, features, raw_text } = createReportDto.extractedData;
+      try {
+        await this.prisma.extractedReportData.create({
+          data: {
+            reportId: report.id,
+            disease: report_type || 'unknown',
+            data: features || {},
+            method: metadata.extraction_method || 'unknown',
+            attempts: metadata.extraction_attempts || 0,
+            rawText: raw_text || null,
+          },
+        });
+      } catch (err) {
+        this.logger.error(`Failed to save extraction audit data for report ${report.id}`, err);
+      }
+    }
+
     this.logger.log(`✅ Medical report created: ${report.id} for user ${userId}`);
 
     // Log this action

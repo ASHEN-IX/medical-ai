@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, memo } from "react";
 import Link from "next/link";
 import gsap from "gsap";
 
@@ -11,12 +11,15 @@ const navLinks = [
   { href: "#pipeline", label: "Pipeline" },
 ];
 
-export default function Navbar() {
+const NavbarComponent = memo(function Navbar() {
   const navRef = useRef<HTMLElement>(null);
+  const animationRef = useRef(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
-    if (!navRef.current) return;
+    if (!navRef.current || animationRef.current) return;
+    animationRef.current = true;
+
     const tl = gsap.timeline();
     tl.fromTo(
       navRef.current,
@@ -70,13 +73,15 @@ export default function Navbar() {
         <div className="hidden items-center gap-3 md:flex">
           <Link
             href="/login"
+            prefetch={true}
             data-nav-link
             className="rounded-lg px-4 py-2 text-sm font-medium text-slate-400 transition-colors hover:text-white"
           >
             Sign In
           </Link>
           <Link
-            href="/upload"
+            href="/(dashboard)"
+            prefetch={true}
             data-nav-link
             className="group relative overflow-hidden rounded-xl bg-gradient-to-r from-violet-600 to-cyan-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-violet-500/25 transition-all duration-300 hover:shadow-[0_0_30px_rgba(124,58,237,0.4)]"
           >
@@ -113,7 +118,9 @@ export default function Navbar() {
             </a>
           ))}
           <Link
-            href="/upload"
+            href="/(dashboard)"
+            prefetch={true}
+            onClick={() => setMobileOpen(false)}
             className="mt-3 block rounded-xl bg-gradient-to-r from-violet-600 to-cyan-500 px-5 py-3 text-center text-sm font-semibold text-white"
           >
             Launch App
@@ -122,4 +129,6 @@ export default function Navbar() {
       )}
     </nav>
   );
-}
+});
+
+export default NavbarComponent;

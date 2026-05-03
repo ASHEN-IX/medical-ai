@@ -79,7 +79,7 @@ export default function HistoryPage() {
           <p className="text-white/60">No analyses match your filters.</p>
           <button
             type="button"
-            onClick={() => router.push("/upload")}
+            onClick={() => router.push("/diagnosis")}
             className="mt-4 rounded-lg bg-cyan-600/30 border border-cyan-500/30 px-5 py-2 text-sm font-semibold text-cyan-200 transition hover:bg-cyan-500/40"
           >
             Run New Analysis
