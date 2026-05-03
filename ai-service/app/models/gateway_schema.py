@@ -17,7 +17,7 @@ class GatewayAnalyzeRequest(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     report_type: ReportType = "auto"
-    features: Dict[str, float | int] = Field(default_factory=dict)
+    features: Dict[str, object] = Field(default_factory=dict)
     raw_text: Optional[str] = None
     include_explanation: bool = True
     symptoms: List[str] = Field(default_factory=list)

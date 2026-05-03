@@ -1,0 +1,22 @@
+{
+  "_template": "diabetes",
+  "_description": "Pima Indians Diabetes Dataset. All numeric values. Feature names are case-sensitive.",
+  "_field_notes": {
+    "Pregnancies":              "Number of times pregnant (integer, 0 if male or unknown)",
+    "Glucose":                  "Plasma glucose concentration mg/dL (2-hour oral glucose tolerance test)",
+    "BloodPressure":            "Diastolic blood pressure in mmHg",
+    "SkinThickness":            "Triceps skin fold thickness in mm",
+    "Insulin":                  "2-Hour serum insulin mu U/ml (0 if not measured)",
+    "BMI":                      "Body Mass Index (weight kg / height m^2)",
+    "DiabetesPedigreeFunction": "Diabetes pedigree function score (family history likelihood, e.g. 0.351)",
+    "Age":                      "Age in years (integer)"
+  },
+  "Pregnancies": 0,
+  "Glucose": 0.0,
+  "BloodPressure": 0.0,
+  "SkinThickness": 0.0,
+  "Insulin": 0.0,
+  "BMI": 0.0,
+  "DiabetesPedigreeFunction": 0.0,
+  "Age": 0
+}

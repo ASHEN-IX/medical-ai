@@ -43,6 +43,7 @@ class ModelClient:
         "stroke": ["/api/v1/stroke/predict", "/api/v1/stroke-risk/predict"],
         "autism_dl": ["/api/v1/autism-dl/predict"],
         "autism_pred": ["/api/v1/autism-pred/predict"],
+        "liver": ["/api/v1/liver-disease/predict", "/api/v1/liver/predict"],
     }
 
     KIDNEY_DEFAULT_PAYLOAD = {
@@ -95,10 +96,51 @@ class ModelClient:
         return await self._predict_model("autism_dl", {"image": image_base64}, request_id, payload_only=[payload])
 
     async def predict_autism_pred(self, features: Mapping[str, Any], request_id: str) -> ModelPrediction:
-        # The autism prediction endpoint expects a strict payload: {"responses": {...}, "demographics": {...}}
+        # The autism prediction endpoint expects nested survey responses and demographics.
+        # Staged analysis often provides a flat feature map, so we adapt it here.
+        responses = dict(features.get("responses") or {})
+        if not responses:
+            responses = {
+                f"A{i}_Score": features.get(f"A{i}_Score", 0)
+                for i in range(1, 11)
+            }
+
+        demographics = dict(features.get("demographics") or {})
+        if not demographics:
+            demographics = {
+                "gender": features.get("gender", "m"),
+                "age": features.get("age"),
+                "ethnicity": features.get("ethnicity"),
+                "jaundice": features.get("jaundice"),
+                "austim": features.get("austim"),
+                "contry_of_res": features.get("contry_of_res"),
+                "used_app_before": features.get("used_app_before"),
+                "result": features.get("result"),
+                "relation": features.get("relation"),
+            }
+        # Normalize categorical values:
+        # - empty strings -> None
+        # - non-numeric country codes -> 'Unknown' (model expects numeric codes or 'Unknown')
+        for _col in ("gender", "ethnicity", "jaundice", "austim", "contry_of_res", "used_app_before", "relation"):
+            val = demographics.get(_col)
+            if isinstance(val, str) and not val.strip():
+                demographics[_col] = None
+                continue
+            if _col == "contry_of_res" and isinstance(val, str):
+                stripped = val.strip()
+                # If the value is not a numeric code, map to 'Unknown' which the encoder accepts
+                if not stripped.isdigit():
+                    demographics[_col] = "Unknown"
+                    continue
+                # keep numeric string as-is (encoder expects numeric codes)
+                demographics[_col] = stripped
+
+        if demographics.get("result") is None:
+            demographics["result"] = float(sum(int(responses.get(f"A{i}_Score", 0) or 0) for i in range(1, 11)))
+
         payload = {
-            "responses": dict(features.get("responses") or {}),
-            "demographics": dict(features.get("demographics") or {}),
+            "responses": responses,
+            "demographics": demographics,
         }
         return await self._predict_model("autism_pred", features, request_id, payload_only=[payload])
 

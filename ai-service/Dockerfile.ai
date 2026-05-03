@@ -10,12 +10,15 @@ RUN apt-get update && apt-get install -y \
     libopenblas-dev \
     liblapack-dev \
     gfortran \
+    tesseract-ocr \
+    libmupdf-dev \
+    python3-tk \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements
 COPY requirements.txt .
 
-# Install Python dependencies
+# Install Python dependencies (cached layer)
 RUN --mount=type=cache,target=/root/.cache/pip \
     python -m pip install --upgrade pip setuptools wheel && \
     for attempt in 1 2 3; do \
@@ -24,7 +27,18 @@ RUN --mount=type=cache,target=/root/.cache/pip \
       if [ "${attempt}" = "3" ]; then exit 1; fi; \
     done
 
-# Copy application code
+# Pre-install spaCy model deterministically (cached layer)
+# Using a pinned wheel avoids flaky `spacy download` resolution in CI/build contexts.
+ARG SPACY_MODEL_VERSION=3.7.1
+RUN --mount=type=cache,target=/root/.cache/pip \
+    for attempt in 1 2 3; do \
+      pip install --prefer-binary --retries 10 --timeout 120 \
+      "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-${SPACY_MODEL_VERSION}/en_core_web_sm-${SPACY_MODEL_VERSION}-py3-none-any.whl" && break; \
+      echo "en_core_web_sm install failed (attempt ${attempt}/3). Retrying..."; \
+      if [ "${attempt}" = "3" ]; then exit 1; fi; \
+    done
+
+# Copy application code (Only this layer re-runs when you edit code)
 COPY . .
 
 # Create data directories

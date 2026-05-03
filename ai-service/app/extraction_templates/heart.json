@@ -1,0 +1,14 @@
+{
+  "_template": "heart",
+  "_description": "Cardiovascular / Heart Disease risk model. Minimal feature set: age, BP, cholesterol, BMI.",
+  "_field_notes": {
+    "age":             "Patient age in years (integer)",
+    "blood_pressure":  "Systolic or diastolic blood pressure in mmHg (float)",
+    "cholesterol":     "Total cholesterol in mg/dL (float)",
+    "bmi":             "Body Mass Index — weight(kg)/height(m)^2 (float)"
+  },
+  "age": 0,
+  "blood_pressure": 0.0,
+  "cholesterol": 0.0,
+  "bmi": 0.0
+}

@@ -64,17 +64,58 @@ class AutismPredictionService:
         if value is None:
             return 0
 
+        # Treat empty strings as missing values
+        if isinstance(value, str) and not value.strip():
+            return 0
+
+        # Handle numeric values directly
         if isinstance(value, (int, float)) and int(value) == value:
             index = int(value)
             if 0 <= index < len(values):
                 return index
 
-        normalized_lookup = {self._normalize(item): idx for idx, item in enumerate(values)}
+        # Special handling for categorical string mappings
         normalized = self._normalize(value)
+        
+        # For gender column: 'm'/'male' -> 0, 'f'/'female' -> 1
+        if column == "gender":
+            if normalized in ("m", "male"):
+                return 0
+            if normalized in ("f", "female"):
+                return 1
+        
+        # For yes/no columns: 'yes' -> 1, 'no' -> 0
+        if column in ("jaundice", "austim", "used_app_before"):
+            if normalized in ("yes", "1", "true"):
+                return 1
+            if normalized in ("no", "0", "false"):
+                return 0
+        
+        # For relation column: Self/Parent/Relative mappings
+        if column == "relation":
+            if normalized in ("self", "0"):
+                return 0
+            if normalized in ("parent", "1"):
+                return 1
+            # Fallback for other relation types
+            if normalized in ("relative", "2"):
+                return 2
+            if normalized in ("health care professional", "healthcare", "professional", "3"):
+                return 3
+        
+        # Generic fallback: try to find in values
+        normalized_lookup = {self._normalize(item): idx for idx, item in enumerate(values)}
         if normalized in normalized_lookup:
             return normalized_lookup[normalized]
 
-        valid_options = ", ".join(values)
+        # Robust Fallback: If the encoder classes are purely numeric (0-9) but the user passed a string (like "Asian"),
+        # try to look it up in the hardcoded fallback options so it maps safely to the correct index.
+        fallback_values = self.FALLBACK_CATEGORY_OPTIONS.get(column, [])
+        normalized_fallback_lookup = {self._normalize(item): idx for idx, item in enumerate(fallback_values)}
+        if normalized in normalized_fallback_lookup:
+            return normalized_fallback_lookup[normalized]
+
+        valid_options = ", ".join(values) + " or " + ", ".join(fallback_values)
         raise ValueError(f"Invalid value for {column}: {value}. Expected one of: {valid_options}")
 
     def _risk_level_from_probability(self, probability: float) -> str:
@@ -202,6 +243,7 @@ class AutismPredictionService:
         risk_level = self._risk_level_from_probability(autism_probability)
         risk_categories = self._risk_categories(payload.responses)
         recommendations = self._recommendations(risk_level)
+        autism_detected = autism_probability >= 0.5
 
         duration_ms = int((time.perf_counter() - started) * 1000)
         model_loader.record_response_time("autism_pred", duration_ms)
@@ -209,6 +251,7 @@ class AutismPredictionService:
         return PredictionResponse(
             success=True,
             prediction=AutismPredictionResult(
+                autism_detected=autism_detected,
                 risk_level=risk_level,
                 autism_probability=round(autism_probability, 4),
                 confidence_score=round(confidence, 4),
