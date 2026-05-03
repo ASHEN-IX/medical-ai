@@ -263,3 +263,28 @@ class StrokeResponse(BaseModel):
     recommendations: List[str]
     metadata: Metadata
     request_id: str
+
+
+class ThyroidRequest(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+
+class ThyroidClassProbabilities(BaseModel):
+    recurrence: float
+    non_recurrence: float
+
+
+class ThyroidPredictionResult(BaseModel):
+    recurrence_detected: bool
+    risk_level: Literal["LOW", "MEDIUM", "HIGH"]
+    confidence_score: float
+    recurrence_probability: float
+    class_probabilities: ThyroidClassProbabilities
+
+
+class ThyroidResponse(BaseModel):
+    success: bool = True
+    prediction: ThyroidPredictionResult
+    recommendations: List[str]
+    metadata: Metadata
+    request_id: str

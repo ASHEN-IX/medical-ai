@@ -82,13 +82,15 @@ class ModelLoader:
             "diabetes_pred": "v1.0",
             "kidney_pred": "v1.0",
             "stroke_pred": "v1.0",
+            "thyroid_pred": "v1.0",
         }
         self.model_response_times_ms = {
             "autism_dl": 0,
             "autism_pred": 0,
             "diabetes_pred": 0,
             "kidney_pred": 0,
-            "stroke_pred": 0,            
+            "stroke_pred": 0,
+            "thyroid_pred": 0,
         }
         self.load_errors: dict[str, str] = {}
 
@@ -103,10 +105,12 @@ class ModelLoader:
             "kidney_label_encoder": None,
             "stroke_model": None,
             "stroke_scaler": None,
+            "thyroid_model": None,
         }
 
         self.stroke_model: Any | None = None
         self.stroke_scaler: Any | None = None
+        self.thyroid_model: Any | None = None
 
     def _load_pickle_like(self, path: Path) -> Any:
         self._register_numpy_compatibility()
@@ -164,6 +168,7 @@ class ModelLoader:
             self._load_diabetes_model()
             self._load_kidney_disease_model()
             self._load_stroke_model()
+            self._load_thyroid_model()
             if self.load_errors:
                 for model_key, reason in self.load_errors.items():
                     logger.error("Model %s is unavailable: %s", model_key, reason)
@@ -459,6 +464,38 @@ class ModelLoader:
             self.load_errors["stroke_pred"] = f"Failed to load stroke model: {exc}"
             logger.exception("Failed to load stroke model from %s", model_path)
 
+    def _load_thyroid_model(self) -> None:
+        model_path = self._resolve_existing_path(
+            [
+                self.models_root / "Throyd-prediction" / "thyroid_recurrence_model.pkl",
+                self.models_root / "thyroid-prediction" / "thyroid_recurrence_model.pkl",
+                self.project_root / "models" / "Throyd-prediction" / "thyroid_recurrence_model.pkl",
+                self.project_root / "models" / "thyroid-prediction" / "thyroid_recurrence_model.pkl",
+            ]
+        )
+        self._paths["thyroid_model"] = str(model_path) if model_path else None
+
+        if model_path is None:
+            self.thyroid_model = None
+            self.load_errors["thyroid_pred"] = "Thyroid model file thyroid_recurrence_model.pkl not found"
+            logger.warning("Thyroid model file not found")
+            return
+
+        artifact_error = self._validate_artifact(model_path, "Thyroid model")
+        if artifact_error is not None:
+            self.thyroid_model = None
+            self.load_errors["thyroid_pred"] = artifact_error
+            logger.error(artifact_error)
+            return
+
+        try:
+            self.thyroid_model = self._load_pickle_like(model_path)
+            logger.info("Loaded thyroid model from %s", model_path)
+        except Exception as exc:
+            self.thyroid_model = None
+            self.load_errors["thyroid_pred"] = f"Failed to load thyroid model: {exc}"
+            logger.exception("Failed to load thyroid model from %s", model_path)
+
     def record_response_time(self, model_key: str, duration_ms: int) -> None:
         if model_key in self.model_response_times_ms:
             self.model_response_times_ms[model_key] = max(0, int(duration_ms))
@@ -469,6 +506,7 @@ class ModelLoader:
         diabetes_loaded = self.diabetes_model is not None
         kidney_loaded = self.kidney_disease_model is not None and self.kidney_scaler is not None
         stroke_loaded = self.stroke_model is not None
+        thyroid_loaded = self.thyroid_model is not None
 
         return {
             "status": "healthy" if dl_loaded and pred_loaded and stroke_loaded else "degraded",
@@ -497,6 +535,11 @@ class ModelLoader:
                     status="loaded" if stroke_loaded else "not_loaded",
                     version=self.model_versions["stroke_pred"],
                     response_time_ms=self.model_response_times_ms["stroke_pred"],
+                ),
+                "thyroid_pred": ModelHealth(
+                    status="loaded" if thyroid_loaded else "not_loaded",
+                    version=self.model_versions["thyroid_pred"],
+                    response_time_ms=self.model_response_times_ms["thyroid_pred"],
                 ),
             },
         }
