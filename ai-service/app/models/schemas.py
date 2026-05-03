@@ -113,6 +113,7 @@ class RiskCategories(BaseModel):
 
 
 class AutismPredictionResult(BaseModel):
+    autism_detected: bool
     risk_level: Literal["LOW", "MEDIUM", "HIGH"]
     autism_probability: float
     confidence_score: float

@@ -24,6 +24,7 @@ from app.services.autism_parser import parse_autism_prediction_request
 from app.services.model_orchestrator import ModelOrchestrator
 from app.services.rag_client import RAGClient, RAGClientError
 from app.services.routing_engine import RoutingEngine
+from app.services.gemini_extractor import GeminiExtractor
 from app.utils.risk_aggregator import aggregate_overall_risk, build_reasoning, priority_from_risk
 
 
@@ -56,6 +57,7 @@ class GatewayService:
         self.kg_client = kg_client or KGClient()
         self.nlp_service = nlp_service or NLPService()
         self.response_aggregator = response_aggregator or AnalysisResponseAggregator()
+        self.gemini_extractor = GeminiExtractor()
 
     async def analyze(self, payload: GatewayAnalyzeRequest, request_id: str) -> GatewayAnalyzeResponse:
         started = time.perf_counter()
@@ -63,23 +65,48 @@ class GatewayService:
         raw_text = getattr(payload, "raw_text", None)
         extracted_report_type = str(payload.report_type)
 
+        # New AI-powered extraction logic
         if raw_text:
-            nlp_result = await asyncio.to_thread(self.nlp_service.process_text, raw_text)
-            extracted_report_type = nlp_result.report_type if nlp_result.report_type != "general" else extracted_report_type
-            extracted_features = self._normalize_features(nlp_result.features)
-            merged_features = dict(extracted_features)
-            merged_features.update(features)
-            features = merged_features
-
             try:
-                if self._looks_like_autism_screening(raw_text) or extracted_report_type == "autism":
-                    parsed = parse_autism_prediction_request(raw_text)
-                    # attach structured survey + demographics so ModelClient can post the expected payload
-                    features["responses"] = parsed.responses.model_dump() if hasattr(parsed.responses, "model_dump") else parsed.responses.dict()
-                    features["demographics"] = parsed.demographics.model_dump() if hasattr(parsed.demographics, "model_dump") else parsed.demographics.dict()
-                    extracted_report_type = "autism"
-            except Exception as exc:  # pylint: disable=broad-except
-                logger.warning("Autism parser failed request_id=%s error=%s", request_id, exc)
+                logger.info("Starting AI-powered extraction request_id=%s", request_id)
+                # Convert text/bytes logic - here we assume raw_text is already extracted if coming from API
+                # or we might need to handle actual file bytes if this was a direct upload.
+                # For now, if we have raw_text, we use it. If we need to support PDF bytes here, 
+                # we'd need them in the payload.
+                
+                # Multimodal: If an image is provided, decode and pass to Gemini
+                image_bytes = None
+                if payload.image:
+                    import base64
+                    try:
+                        header, encoded = payload.image.split(",", 1) if "," in payload.image else (None, payload.image)
+                        image_bytes = base64.b64decode(encoded)
+                    except Exception:
+                        logger.warning("Failed to decode image for multimodal extraction")
+
+                extraction = await asyncio.to_thread(
+                    self.gemini_extractor._try_gemini, 
+                    raw_text, 
+                    hint_disease=extracted_report_type if extracted_report_type != "auto" else None,
+                    image_bytes=image_bytes
+                )
+                
+                if extraction:
+                    extracted_report_type = extraction.disease
+                    features = self._normalize_features(extraction.data)
+                    logger.info("AI extraction successful request_id=%s disease=%s method=%s", 
+                                request_id, extraction.disease, extraction.method)
+                else:
+                    logger.warning("AI extraction failed to return result, falling back to legacy regex parsers")
+                    fallback_result = await asyncio.to_thread(self.gemini_extractor._legacy_fallback, raw_text)
+                    extracted_report_type = fallback_result.disease
+                    features = self._normalize_features(fallback_result.data)
+
+            except Exception as exc:
+                logger.error("AI extraction critical failure request_id=%s error=%s", request_id, exc)
+                fallback_result = await asyncio.to_thread(self.gemini_extractor._legacy_fallback, raw_text)
+                extracted_report_type = fallback_result.disease
+                features = self._normalize_features(fallback_result.data)
 
         self._validate_payload(payload, features)
 
@@ -242,9 +269,9 @@ class GatewayService:
         return KnowledgeGraphContext()
 
     def _validate_payload(self, payload: GatewayAnalyzeRequest, features: Mapping[str, Any]) -> None:
-        if not features and not payload.image and not payload.symptoms:
+        if not features and not payload.raw_text and not payload.image and not payload.symptoms:
             raise GatewayValidationError(
-                "Missing features: provide clinical features, symptoms, or image input",
+                "Missing features: provide clinical features, raw text, symptoms, or image input",
                 status_code=400,
             )
 
@@ -257,6 +284,10 @@ class GatewayService:
 
             if isinstance(value, str):
                 stripped = value.strip()
+                # Treat empty strings as missing
+                if stripped == "":
+                    normalized[key] = None
+                    continue
                 try:
                     normalized[key] = float(stripped)
                     continue

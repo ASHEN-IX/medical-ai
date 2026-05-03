@@ -15,6 +15,7 @@ except ImportError:  # pragma: no cover - depends on optional runtime package
     Doc = Any
 
 from app.utils.medical_patterns import (
+    AUTISM_MARKER_KEYWORDS,
     BMI_PATTERN,
     BP_PATTERN,
     CHOLESTEROL_PATTERN,
@@ -133,6 +134,10 @@ class NLPService:
 
     def classify_report_type(self, text: str, features: dict[str, float | int]) -> str:
         lowered = text.lower()
+
+        # Autism detection takes priority over other conditions
+        if any(marker in lowered for marker in AUTISM_MARKER_KEYWORDS):
+            return "autism"
 
         if "glucose" in features or any(marker in lowered for marker in DIABETES_MARKER_KEYWORDS):
             return "diabetes"

@@ -7,7 +7,7 @@ export type PriorityLevel = "LOW" | "MEDIUM" | "URGENT";
 
 export interface AnalyzeReportPayload {
   report_type: ReportType;
-  features: Record<string, number>;
+  features: Record<string, number | string | null | undefined>;
   raw_text?: string;
   include_explanation?: boolean;
   symptoms?: string[];
@@ -17,7 +17,7 @@ export interface AnalyzeReportPayload {
 export interface ProcessReportResponse {
   success: boolean;
   report_type: string;
-  features: Record<string, number>;
+  features: Record<string, number | string | null | undefined>;
   confidence_scores: Record<string, number>;
   raw_text: string;
   metadata: {
@@ -36,6 +36,7 @@ export interface GatewayModelDetail extends GatewayModelResult {
   source?: string;
   success?: boolean;
   error?: string | null;
+  autism_detected?: boolean;
   raw_response?: Record<string, unknown> | null;
 }
 
@@ -295,6 +296,8 @@ export interface FinalReportResponse {
   updated_risk: RiskLevel;
   updated_confidence: number;
   model_outputs: Record<string, unknown>;
+  rag_context: string[];
+  kg_insights: Record<string, unknown>;
   evidence_summary: string[];
   missing_caveats: string[];
   recommendations: string[];
@@ -316,8 +319,12 @@ export async function stagedAnalyze(payload: AnalyzeReportPayload): Promise<Stag
     const { data } = await apiClient.post<StagedAnalyzeResponse>("/ai/diagnosis/analyze", payload);
     return data;
   } catch {
-    const { data } = await aiGatewayApi.post<StagedAnalyzeResponse>("/api/v1/diagnosis/analyze", payload);
-    return data;
+    try {
+      const { data } = await aiGatewayApi.post<StagedAnalyzeResponse>("/api/v1/diagnosis/analyze", payload);
+      return data;
+    } catch (error) {
+      throw normalizeError(error);
+    }
   }
 }
 
@@ -326,8 +333,12 @@ export async function fetchFollowUpQuestions(sessionId: string): Promise<FetchQu
     const { data } = await apiClient.post<FetchQuestionsResponse>("/ai/diagnosis/questions", { session_id: sessionId });
     return data;
   } catch {
-    const { data } = await aiGatewayApi.post<FetchQuestionsResponse>("/api/v1/diagnosis/questions", { session_id: sessionId });
-    return data;
+    try {
+      const { data } = await aiGatewayApi.post<FetchQuestionsResponse>("/api/v1/diagnosis/questions", { session_id: sessionId });
+      return data;
+    } catch (error) {
+      throw normalizeError(error);
+    }
   }
 }
 
@@ -336,8 +347,12 @@ export async function submitFollowUpAnswers(sessionId: string, answers: PatientA
     const { data } = await apiClient.post<SubmitAnswersResponse>("/ai/diagnosis/answers", { session_id: sessionId, answers });
     return data;
   } catch {
-    const { data } = await aiGatewayApi.post<SubmitAnswersResponse>("/api/v1/diagnosis/answers", { session_id: sessionId, answers });
-    return data;
+    try {
+      const { data } = await aiGatewayApi.post<SubmitAnswersResponse>("/api/v1/diagnosis/answers", { session_id: sessionId, answers });
+      return data;
+    } catch (error) {
+      throw normalizeError(error);
+    }
   }
 }
 
@@ -346,8 +361,12 @@ export async function generateFinalReport(sessionId: string): Promise<FinalRepor
     const { data } = await apiClient.post<FinalReportResponse>("/ai/diagnosis/final-report", { session_id: sessionId });
     return data;
   } catch {
-    const { data } = await aiGatewayApi.post<FinalReportResponse>("/api/v1/diagnosis/final-report", { session_id: sessionId });
-    return data;
+    try {
+      const { data } = await aiGatewayApi.post<FinalReportResponse>("/api/v1/diagnosis/final-report", { session_id: sessionId });
+      return data;
+    } catch (error) {
+      throw normalizeError(error);
+    }
   }
 }
 

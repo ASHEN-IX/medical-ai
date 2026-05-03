@@ -23,6 +23,13 @@ logger = logging.getLogger(__name__)
 RISK_THRESHOLDS = {"HIGH": 0.65, "MEDIUM": 0.45}
 
 DISEASE_QUESTION_TEMPLATES: Dict[str, List[Dict[str, Any]]] = {
+    "autism": [
+        {"category": "social", "topic": "response_to_name", "text": "Does the child consistently respond when their name is called?", "priority": 9},
+        {"category": "social", "topic": "joint_attention", "text": "Does the child use pointing, gestures, or eye contact to share interest?", "priority": 9},
+        {"category": "play", "topic": "pretend_play", "text": "Does the child engage in pretend play or social back-and-forth play?", "priority": 8},
+        {"category": "development", "topic": "language_delay", "text": "Have language milestones or daily communication skills been delayed?", "priority": 8},
+        {"category": "behavior", "topic": "repetitive_or_sensory", "text": "Are repetitive movements, restricted interests, or sensory sensitivities present?", "priority": 8},
+    ],
     "heart_disease": [
         {"category": "symptom", "topic": "chest_pain", "text": "Do you experience chest pain or tightness during physical activity or at rest?", "priority": 9},
         {"category": "symptom", "topic": "shortness_of_breath", "text": "Do you experience shortness of breath when climbing stairs, walking, or lying down?", "priority": 8},
@@ -73,6 +80,9 @@ DISEASE_QUESTION_TEMPLATES: Dict[str, List[Dict[str, Any]]] = {
 }
 
 MODEL_TO_DISEASE_KEY = {
+    "autism": "autism",
+    "autism_pred": "autism",
+    "autism_dl": "autism",
     "heart": "heart_disease",
     "diabetes": "diabetes",
     "kidney": "kidney_disease",

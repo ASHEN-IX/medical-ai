@@ -49,7 +49,7 @@ export default function DoctorReviewsPage() {
       return;
     }
     if (user.role !== "DOCTOR" && user.role !== "ADMIN") {
-      router.push("/upload");
+      router.push("/diagnosis");
       return;
     }
 

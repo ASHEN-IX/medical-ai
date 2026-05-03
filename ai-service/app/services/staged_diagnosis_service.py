@@ -34,6 +34,7 @@ from app.utils.risk_aggregator import aggregate_overall_risk, normalize_risk
 logger = logging.getLogger(__name__)
 
 FOLLOW_UP_RISK_THRESHOLD = "MEDIUM"
+ALLOWED_REPORT_TYPES = {"auto", "diabetes", "heart", "kidney", "stroke", "autism", "mixed"}
 
 
 class StagedDiagnosisError(RuntimeError):
@@ -77,9 +78,10 @@ class StagedDiagnosisService:
     ) -> InitialAnalysisResponse:
         started = time.perf_counter()
         session_id = f"sess_{uuid4().hex[:16]}"
+        normalized_report_type = self._normalize_report_type(report_type)
 
         gateway_request = GatewayAnalyzeRequest(
-            report_type=report_type,
+            report_type=normalized_report_type,
             features={k: v for k, v in features.items() if isinstance(v, (int, float))},
             raw_text=raw_text,
             include_explanation=include_explanation,
@@ -93,7 +95,22 @@ class StagedDiagnosisService:
         selected_disease = self._pick_top_disease(gateway_response.model_outputs, gateway_response.selected_models)
         max_confidence = self._max_confidence(gateway_response.results)
 
-        needs_follow_up = self._should_follow_up(overall_risk, max_confidence)
+        is_autism = any(m in gateway_response.selected_models for m in ("autism_pred", "autism_dl"))
+        autism_detected = False
+        if is_autism:
+            for m in ("autism_pred", "autism_dl"):
+                detail = gateway_response.model_outputs.get(m)
+                if detail and detail.raw_response:
+                    pred = detail.raw_response.get("prediction", {})
+                    if pred.get("autism_detected"):
+                        autism_detected = True
+                        break
+            if autism_detected:
+                selected_disease = "autism"
+            needs_follow_up = autism_detected
+        else:
+            needs_follow_up = self._should_follow_up(overall_risk, max_confidence)
+
         questions: List[FollowUpQuestion] = []
 
         if needs_follow_up and selected_disease:
@@ -242,6 +259,7 @@ class StagedDiagnosisService:
 
         updated_risk = second_pass.risk_assessment.overall_risk
         updated_confidence = self._max_confidence(second_pass.results)
+        rag_context = self._unique_texts(list(second_pass.rag_context))
 
         evidence = self._build_evidence_summary(session, second_pass, merged_features)
         caveats = self._build_caveats(session, second_pass)
@@ -265,6 +283,8 @@ class StagedDiagnosisService:
         session.final_report = {
             "updated_risk": updated_risk,
             "updated_confidence": updated_confidence,
+            "rag_context": rag_context,
+            "kg_insights": second_pass.kg_insights.model_dump(),
             "evidence": evidence,
             "caveats": caveats,
             "recommendations": recs,
@@ -286,6 +306,8 @@ class StagedDiagnosisService:
             updated_risk=updated_risk,
             updated_confidence=updated_confidence,
             model_outputs={k: v.model_dump() for k, v in second_pass.model_outputs.items()},
+            rag_context=rag_context,
+            kg_insights=second_pass.kg_insights.model_dump(),
             evidence_summary=evidence,
             missing_caveats=caveats,
             recommendations=recs,
@@ -310,6 +332,23 @@ class StagedDiagnosisService:
         if session is None:
             raise StagedDiagnosisError(f"Session {session_id} not found or expired", status_code=404)
         return session
+
+    def _normalize_report_type(self, report_type: Optional[str]) -> str:
+        if not report_type:
+            return "auto"
+
+        normalized = report_type.strip().lower()
+        if normalized == "general":
+            return "auto"
+
+        if normalized in ALLOWED_REPORT_TYPES:
+            return normalized
+
+        logger.warning(
+            "Unsupported report_type=%s for staged diagnosis; falling back to auto",
+            report_type,
+        )
+        return "auto"
 
     def _should_follow_up(self, overall_risk: str, confidence: float) -> bool:
         risk = overall_risk.strip().upper()
@@ -356,6 +395,17 @@ class StagedDiagnosisService:
             if conf > max_conf:
                 max_conf = conf
         return max_conf
+
+    def _unique_texts(self, items: List[str]) -> List[str]:
+        unique: List[str] = []
+        seen: set[str] = set()
+        for item in items:
+            cleaned = item.strip()
+            if not cleaned or cleaned in seen:
+                continue
+            seen.add(cleaned)
+            unique.append(cleaned)
+        return unique
 
     def _build_evidence_summary(self, session: DiagnosisSession, second_pass: Any, merged: Dict[str, Any]) -> List[str]:
         evidence: List[str] = []

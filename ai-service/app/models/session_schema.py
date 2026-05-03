@@ -120,6 +120,8 @@ class FinalReportResponse(BaseModel):
     updated_risk: RiskLevel
     updated_confidence: float
     model_outputs: Dict[str, Any] = Field(default_factory=dict)
+    rag_context: List[str] = Field(default_factory=list)
+    kg_insights: Dict[str, Any] = Field(default_factory=dict)
     evidence_summary: List[str] = Field(default_factory=list)
     missing_caveats: List[str] = Field(default_factory=list)
     recommendations: List[str] = Field(default_factory=list)

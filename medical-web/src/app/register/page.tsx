@@ -91,7 +91,7 @@ export default function RegisterPage() {
       });
 
       setSuccess(true);
-      setTimeout(() => router.push("/upload"), 800);
+      setTimeout(() => router.push("/diagnosis"), 800);
     } catch (err) {
       if (err instanceof z.ZodError) {
         const fe: Record<string, string> = {};

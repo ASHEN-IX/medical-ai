@@ -17,6 +17,7 @@ from app.models.session_schema import (
     SubmitAnswersResponse,
 )
 from app.models.schemas import ErrorResponse
+from app.services.gateway_service import GatewayValidationError
 from app.services.report_service import ReportService, ReportValidationError
 from app.services.staged_diagnosis_service import StagedDiagnosisError, StagedDiagnosisService
 
@@ -36,7 +37,7 @@ class StagedUploadParams(BaseModel):
 
 class StagedAnalyzeRequest(BaseModel):
     report_type: str = "auto"
-    features: Dict[str, float] = Field(default_factory=dict)
+    features: Dict[str, object] = Field(default_factory=dict)
     raw_text: Optional[str] = None
     include_explanation: bool = True
     symptoms: List[str] = Field(default_factory=list)
@@ -87,6 +88,8 @@ async def staged_upload_report(
         raise HTTPException(status_code=exc.status_code, detail={"code": "INVALID_REPORT", "message": str(exc)}) from exc
     except StagedDiagnosisError as exc:
         raise HTTPException(status_code=exc.status_code, detail={"code": "DIAGNOSIS_ERROR", "message": str(exc)}) from exc
+    except GatewayValidationError as exc:
+        raise HTTPException(status_code=exc.status_code, detail={"code": "VALIDATION_ERROR", "message": str(exc)}) from exc
     except Exception as exc:
         logger.exception("Staged upload failed request_id=%s", request_id)
         raise HTTPException(status_code=500, detail={"code": "UPLOAD_FAILED", "message": str(exc)}) from exc
@@ -118,6 +121,8 @@ async def staged_analyze(
         )
     except StagedDiagnosisError as exc:
         raise HTTPException(status_code=exc.status_code, detail={"code": "DIAGNOSIS_ERROR", "message": str(exc)}) from exc
+    except GatewayValidationError as exc:
+        raise HTTPException(status_code=exc.status_code, detail={"code": "VALIDATION_ERROR", "message": str(exc)}) from exc
     except Exception as exc:
         logger.exception("Staged analysis failed request_id=%s", request_id)
         raise HTTPException(status_code=500, detail={"code": "ANALYSIS_FAILED", "message": str(exc)}) from exc

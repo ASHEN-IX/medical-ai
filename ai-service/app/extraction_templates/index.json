@@ -1,0 +1,19 @@
+{
+  "_description": "Central index of all extraction templates. After OCR, fill the matching template and pass it directly to the model service.",
+  "templates": {
+    "autism":   "autism.json",
+    "diabetes": "diabetes.json",
+    "heart":    "heart.json",
+    "liver":    "liver.json",
+    "kidney":   "kidney.json",
+    "stroke":   "stroke.json"
+  },
+  "report_type_keywords": {
+    "autism":   ["M-CHAT", "autism", "ASD", "developmental screening", "A1_Score", "A10_Score"],
+    "diabetes": ["glucose", "insulin", "diabetes", "HbA1c", "BMI", "pedigree"],
+    "heart":    ["cholesterol", "cardiac", "heart", "cardiovascular", "ECG", "blood pressure"],
+    "liver":    ["bilirubin", "ALT", "AST", "albumin", "liver", "hepatic", "SGPT", "SGOT"],
+    "kidney":   ["creatinine", "CKD", "kidney", "renal", "hemoglobin", "hematocrit", "urine"],
+    "stroke":   ["stroke", "cerebrovascular", "hypertension", "glucose", "smoking", "married"]
+  }
+}

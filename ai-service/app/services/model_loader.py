@@ -360,11 +360,11 @@ class ModelLoader:
         model_path = self._resolve_existing_path(
             [
                 self.models_root / "autism-prediction" / "best-model-autism.pkl",
-                self.models_root / "autism-prediction" / "best_model.pkl",
+                self.models_root / "autism-prediction" / "best-model-autism.pkl",
                 self.models_root / "best-model-autism.pkl",
-                self.models_root / "best_model.pkl",
+                self.models_root / "best-model-autism.pkl",
                 self.project_root / "models" / "autism-prediction" / "best-model-autism.pkl",
-                self.project_root / "models" / "autism-prediction" / "best_model.pkl",
+                self.project_root / "models" / "autism-prediction" / "best-model-autism.pkl",
                 self.project_root / "legacy" / "gradio" / "autism-prediction" / "models" / "best-model-autism.pkl",
                 self.project_root / "legacy" / "gradio" / "autism-prediction" / "models" / "best_model.pkl",
             ]

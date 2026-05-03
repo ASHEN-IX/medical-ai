@@ -16,7 +16,16 @@ export interface AiAnalyzeResponse {
   success: boolean;
   request_id: string;
   extracted_features: Record<string, unknown>;
-  model_outputs: Record<string, { risk: string; confidence: number; source?: string }>;
+  model_outputs: Record<
+    string,
+    {
+      risk: string;
+      confidence: number;
+      source?: string;
+      autism_detected?: boolean;
+      raw_response?: Record<string, unknown>;
+    }
+  >;
   rag_context: string[];
   kg_insights: {
     diseases: string[];
@@ -35,7 +44,7 @@ export interface AiAnalyzeResponse {
   llm_explanation_text: string;
   final_decision: string;
   selected_models: string[];
-  results: Record<string, { risk: string; confidence: number }>;
+  results: Record<string, { risk: string; confidence: number; autism_detected?: boolean }>;
   final_assessment: { overall_risk: string; priority: string };
   reasoning: string[];
   llm_explanation?: {
@@ -56,7 +65,7 @@ export interface AiChatPayload {
 
 export interface StagedAnalyzePayload {
   report_type: string;
-  features: Record<string, number>;
+  features: Record<string, number | string | null | undefined>;
   raw_text?: string;
   include_explanation?: boolean;
   symptoms?: string[];
@@ -132,6 +141,8 @@ export interface FinalReportResponse {
   updated_risk: string;
   updated_confidence: number;
   model_outputs: Record<string, unknown>;
+  rag_context: string[];
+  kg_insights: Record<string, unknown>;
   evidence_summary: string[];
   missing_caveats: string[];
   recommendations: string[];
@@ -175,6 +186,7 @@ export class AiProxyService {
       );
       const healthScore = this.calculateHealthScore(data);
       const keyFindings = this.extractKeyFindings(data);
+      const storedResults = this.persistCanonicalAutismFlag(data);
 
       const analysis = await this.prisma.analysis.create({
         data: {
@@ -183,7 +195,7 @@ export class AiProxyService {
           selectedModels: data.selected_models || [],
           features: payload.features || {},
           symptoms: payload.symptoms || [],
-          results: data.results || {},
+          results: storedResults,
           healthScore,
           riskLevel,
           keyFindings,
@@ -389,6 +401,23 @@ export class AiProxyService {
     }
 
     return Math.max(0, Math.min(100, Math.round(score)));
+  }
+
+  private persistCanonicalAutismFlag(response: AiAnalyzeResponse): Record<string, unknown> {
+    const results = { ...(response.results || {}) } as Record<string, any>;
+    const autismModel = response.model_outputs?.autism_pred || response.model_outputs?.autism_dl;
+    const autismDetected = autismModel?.raw_response?.prediction?.autism_detected;
+
+    if (typeof autismDetected === 'boolean') {
+      const autismKey = response.model_outputs?.autism_pred ? 'autism_pred' : 'autism_dl';
+      const existing = { ...(results[autismKey] || {}) };
+      results[autismKey] = {
+        ...existing,
+        autism_detected: autismDetected,
+      };
+    }
+
+    return results;
   }
 
   private extractKeyFindings(response: AiAnalyzeResponse): string[] {

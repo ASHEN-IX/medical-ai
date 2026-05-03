@@ -107,7 +107,7 @@ export default function DoctorQueuePage() {
       return;
     }
     if (user.role !== "DOCTOR" && user.role !== "ADMIN") {
-      router.push("/upload");
+      router.push("/diagnosis");
       return;
     }
     void loadData();

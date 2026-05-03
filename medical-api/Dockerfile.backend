@@ -14,18 +14,20 @@ RUN pnpm config set fetch-retries 5 && \
 	pnpm config set fetch-timeout 600000 && \
 	pnpm config set network-concurrency 1
 
-# Copy package files
-COPY package.json ./
+# Copy dependency files first
+COPY package.json pnpm-lock.yaml* ./
+# Copy prisma schema specifically to allow client generation before code copy
+COPY prisma ./prisma/
 
-# Install dependencies
+# Install dependencies (cached layer)
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
 	pnpm install --prefer-offline
 
-# Copy source code
-COPY . .
+# Generate Prisma client (only re-runs if schema changes, NOT on code changes)
+RUN for i in 1 2 3; do pnpm prisma:generate && break || (echo "Prisma generate failed, retrying in 5s..." && sleep 5); done
 
-# Generate Prisma client
-RUN pnpm prisma:generate
+# Finally copy the rest of the application code
+COPY . .
 
 # Expose port
 EXPOSE 3000

@@ -77,9 +77,22 @@ model MedicalReport {
 
   predictions Prediction[]
   analyses    Analysis[]
+  extraction  ExtractedReportData?
 
   @@index([userId])
   @@index([createdAt])
+}
+
+model ExtractedReportData {
+  id             String        @id @default(uuid())
+  reportId       String        @unique
+  report         MedicalReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  disease        String
+  data           Json
+  method         String        // gemini, gemini_partial, fallback_regex
+  attempts       Int
+  rawText        String?
+  createdAt      DateTime      @default(now())
 }
 
 model Prediction {

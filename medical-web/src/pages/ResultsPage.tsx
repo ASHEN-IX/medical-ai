@@ -36,6 +36,30 @@ function isAutismFocused(selectedModels: string[]): boolean {
   return selectedModels.some((modelName) => AUTISM_MODELS.includes(modelName));
 }
 
+function getAutismDecision(activeAnalysis: any): { autismDetected: boolean; autismProbability: number | null } {
+  const autismPred = activeAnalysis?.response?.model_outputs?.autism_pred;
+  const autismDl = activeAnalysis?.response?.model_outputs?.autism_dl;
+  const autismDetails = autismPred?.raw_response?.prediction || autismDl?.raw_response?.prediction;
+
+  const autismDetected = typeof autismDetails?.autism_detected === "boolean"
+    ? autismDetails.autism_detected
+    : typeof autismPred?.autism_detected === "boolean"
+      ? autismPred.autism_detected
+      : typeof autismDl?.autism_detected === "boolean"
+        ? autismDl.autism_detected
+        : false;
+
+  const autismProbability = typeof autismDetails?.autism_probability === "number"
+    ? autismDetails.autism_probability
+    : typeof autismPred?.confidence === "number"
+      ? autismPred.confidence
+      : typeof autismDl?.confidence === "number"
+        ? autismDl.confidence
+        : null;
+
+  return { autismDetected, autismProbability };
+}
+
 function getDetectedCondition(selectedModels: string[], overallRisk: string): string {
   if (selectedModels.includes("autism_pred") || selectedModels.includes("autism_dl")) {
     return "Autism Spectrum Screening";
@@ -178,6 +202,7 @@ export default function ResultsPage() {
   const activeAnalysis = currentAnalysis;
   const detectedModels = activeAnalysis?.response.selected_models || [];
   const autismFocused = isAutismFocused(detectedModels);
+  const { autismDetected, autismProbability } = getAutismDecision(activeAnalysis);
 
   const orderedModels = useMemo(() => {
     if (!activeAnalysis) {
@@ -217,18 +242,26 @@ export default function ResultsPage() {
 
   const { response } = activeAnalysis;
   const progressValue = riskProgressValue(response.final_assessment.overall_risk);
-  const detectedCondition = getDetectedCondition(detectedModels, response.final_assessment.overall_risk);
-  const clinicalSummary = buildClinicalSummary(
-    detectedModels,
-    response.final_assessment.overall_risk,
-    response.final_decision
-  );
-  const recommendations = buildRecommendations(
-    detectedModels,
-    response.final_assessment.overall_risk,
-    response.final_decision
-  );
-  const followUpQuestions = buildFollowUpQuestions(detectedModels, response.final_assessment.overall_risk);
+
+  const detectedCondition = autismFocused
+    ? autismDetected
+      ? "Autism: Positive"
+      : "Autism: Negative"
+    : getDetectedCondition(detectedModels, response.final_assessment.overall_risk);
+
+  const clinicalSummary = autismFocused
+    ? autismDetected
+      ? "Screening pattern is consistent with autism spectrum features. Continue with follow-up questions and specialist referral as appropriate."
+      : "No autism-like screening pattern detected. No autism-specific follow-up questions will be generated."
+    : buildClinicalSummary(detectedModels, response.final_assessment.overall_risk, response.final_decision);
+
+  const recommendations = autismFocused
+    ? autismDetected
+      ? AUTISM_RECOMMENDATIONS
+      : []
+    : buildRecommendations(detectedModels, response.final_assessment.overall_risk, response.final_decision);
+
+  const followUpQuestions = autismFocused ? (autismDetected ? AUTISM_FOLLOW_UP_QUESTIONS : []) : buildFollowUpQuestions(detectedModels, response.final_assessment.overall_risk);
   const filteredRagContext = autismFocused
     ? response.rag_context.filter((item) => item.toLowerCase().includes("autism_spectrum_disorder"))
     : response.rag_context;
@@ -322,7 +355,11 @@ export default function ResultsPage() {
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white/80 p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Gateway Confidence</p>
-            <p className="mt-2 text-sm font-semibold text-slate-900">{formatConfidence(response.results[detectedModels[0] || ""]?.confidence || 0.9)}</p>
+            <p className="mt-2 text-sm font-semibold text-slate-900">
+              {autismFocused && autismProbability !== null
+                ? `${formatConfidence(autismProbability)} — ${autismDetected ? "ASD Detected" : "No ASD"}`
+                : formatConfidence(response.results[detectedModels[0] || ""]?.confidence || 0.9)}
+            </p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white/80 p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Decision</p>
@@ -346,7 +383,12 @@ export default function ResultsPage() {
 
       <div className="grid gap-4 md:grid-cols-3">
         {orderedModels.map((modelName) => (
-          <ModelResultCard key={modelName} modelName={modelName} result={response.results[modelName]} />
+          <ModelResultCard 
+            key={modelName} 
+            modelName={modelName} 
+            result={response.results[modelName]} 
+            detail={response.model_outputs[modelName]}
+          />
         ))}
       </div>
 
@@ -381,29 +423,45 @@ export default function ResultsPage() {
         </article>
       ) : null}
 
-      <article className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
-        <h2 className="text-lg font-semibold text-slate-900">Recommendations</h2>
-        <ul className="mt-3 space-y-2 text-sm text-slate-700">
-          {recommendations.map((recommendation, index) => (
-            <li key={`${recommendation}-${index}`} className="rounded-lg bg-slate-50 px-3 py-2">
-              {recommendation}
-            </li>
-          ))}
-        </ul>
-      </article>
+      {autismFocused && !autismDetected ? null : (
+        <article className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-900">Recommendations</h2>
+          <ul className="mt-3 space-y-2 text-sm text-slate-700">
+            {autismFocused
+              ? autismDetected
+                ? AUTISM_RECOMMENDATIONS.map((r, i) => (
+                    <li key={`rec-${i}`} className="rounded-lg bg-slate-50 px-3 py-2">
+                      {r}
+                    </li>
+                  ))
+                : [
+                    <li key="none" className="rounded-lg bg-slate-50 px-3 py-2">
+                      No autism-specific recommendations.
+                    </li>,
+                  ]
+              : recommendations.map((recommendation, index) => (
+                  <li key={`${recommendation}-${index}`} className="rounded-lg bg-slate-50 px-3 py-2">
+                    {recommendation}
+                  </li>
+                ))}
+          </ul>
+        </article>
+      )}
 
-      <article className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
-        <h2 className="text-lg font-semibold text-slate-900">Follow-up Questions</h2>
-        <p className="mt-1 text-sm text-slate-600">Use these questions to understand possible causes and context for the detected pattern.</p>
-        <ol className="mt-3 space-y-2 text-sm text-slate-700">
-          {followUpQuestions.map((question, index) => (
-            <li key={`${question}-${index}`} className="rounded-lg bg-slate-50 px-3 py-2">
-              <span className="mr-2 font-semibold text-cyan-700">Q{index + 1}.</span>
-              {question}
-            </li>
-          ))}
-        </ol>
-      </article>
+      {(autismFocused && !autismDetected) ? null : (
+        <article className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-900">Follow-up Questions</h2>
+          <p className="mt-1 text-sm text-slate-600">Use these questions to understand possible causes and context for the detected pattern.</p>
+          <ol className="mt-3 space-y-2 text-sm text-slate-700">
+            {followUpQuestions.map((question, index) => (
+              <li key={`${question}-${index}`} className="rounded-lg bg-slate-50 px-3 py-2">
+                <span className="mr-2 font-semibold text-cyan-700">Q{index + 1}.</span>
+                {question}
+              </li>
+            ))}
+          </ol>
+        </article>
+      )}
 
       {response.kg_insights.connections.length > 0 ? (
         <article className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">

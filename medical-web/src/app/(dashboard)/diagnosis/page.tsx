@@ -38,10 +38,10 @@ function RiskBadge({ level }: { level: string }) {
 function StepIndicator({ current }: { current: Step }) {
   const steps: { key: Step; label: string }[] = [
     { key: "upload", label: "Upload Report" },
-    { key: "analyzing", label: "Initial Analysis" },
-    { key: "questions", label: "Follow-Up Questions" },
-    { key: "submitting", label: "Processing Answers" },
-    { key: "report", label: "Final Report" },
+    { key: "analyzing", label: "Analysis" },
+    { key: "questions", label: "Follow-Up" },
+    { key: "submitting", label: "Processing" },
+    { key: "report", label: "Report" },
   ];
 
   const currentIndex = steps.findIndex((s) => s.key === current);
@@ -177,9 +177,9 @@ export default function StagedDiagnosisPage() {
       <div className="mx-auto max-w-4xl space-y-8">
         {/* Header */}
         <div className="rounded-2xl border border-white/10 bg-white/5 p-8 shadow-2xl backdrop-blur-xl">
-          <h1 className="text-3xl font-bold tracking-tight text-white">Staged Diagnosis</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-white">Diagnosis</h1>
           <p className="mt-2 text-sm text-white/60">
-            Upload your report, answer targeted follow-up questions, and receive an enriched diagnosis.
+            Upload your medical report for AI-powered analysis with targeted follow-up questions.
           </p>
           <div className="mt-6">
             <StepIndicator current={step} />
@@ -399,32 +399,53 @@ export default function StagedDiagnosisPage() {
                   onClick={handleReset}
                   className="mt-6 rounded-xl border border-white/20 bg-white/5 px-6 py-3 text-sm font-medium text-white transition-all hover:bg-white/10"
                 >
-                  Upload Another Report
+                  Start New Diagnosis
                 </button>
               </div>
             )}
 
             {/* Full final report */}
-            {finalReport && (
-              <>
-                {/* Risk comparison */}
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl">
-                  <h2 className="text-xl font-bold text-white">Final Diagnosis Report</h2>
-                  <p className="mt-2 text-sm text-white/60">
-                    {finalReport.selected_disease?.replace(/_/g, " ") || finalReport.report_type} analysis
-                  </p>
+            {finalReport && (() => {
+              const uniqueRagContext = Array.from(new Set(finalReport?.rag_context || []));
+              const kg = finalReport.kg_insights || {};
+              
+              // Parse RAG and KG into structured sections
+              const symptoms = uniqueRagContext
+                .filter(r => r.toLowerCase().includes('symptom'))
+                .map(r => r.split(' | ').pop() || r);
+              const support = uniqueRagContext
+                .filter(r => r.toLowerCase().includes('support') || r.toLowerCase().includes('treatment') || r.toLowerCase().includes('therapy'))
+                .map(r => r.split(' | ').pop() || r);
+              const riskFactors = Array.isArray(kg.risk_factors) ? kg.risk_factors : [];
+              const otherRag = uniqueRagContext
+                .filter(r => !r.toLowerCase().includes('symptom') && !r.toLowerCase().includes('support') && !r.toLowerCase().includes('treatment') && !r.toLowerCase().includes('therapy'))
+                .map(r => r.split(' | ').pop() || r);
 
-                  <div className="mt-6 grid gap-6 sm:grid-cols-2">
-                    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
-                      <span className="text-xs font-semibold uppercase tracking-wider text-white/50">Initial Assessment</span>
-                      <div className="mt-3 flex items-center gap-3">
+              return (
+              <article className="rounded-2xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl">
+                {/* Section 1: Condition Overview */}
+                <div className="border-b border-white/10 pb-6">
+                  <h2 className="text-lg font-bold text-white">Condition Overview</h2>
+                  <p className="mt-3 text-sm text-white/75">
+                    The clinical analysis focused on <strong>{finalReport.selected_disease?.replace(/_/g, " ") || finalReport.report_type}</strong> based on your reported symptoms, medical history, and follow-up responses.
+                  </p>
+                </div>
+
+                {/* Section 2: Clinical Assessment */}
+                <div className="mt-6 border-b border-white/10 pb-6">
+                  <h2 className="text-lg font-bold text-white">Clinical Assessment</h2>
+                  
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-white/50">Initial Finding</span>
+                      <div className="mt-3 flex items-center gap-2">
                         <RiskBadge level={finalReport.initial_vs_final.initial_risk} />
                         <span className="text-sm text-white/70">{(finalReport.initial_vs_final.initial_confidence * 100).toFixed(1)}% confidence</span>
                       </div>
                     </div>
-                    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+                    <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
                       <span className="text-xs font-semibold uppercase tracking-wider text-white/50">Final Assessment</span>
-                      <div className="mt-3 flex items-center gap-3">
+                      <div className="mt-3 flex items-center gap-2">
                         <RiskBadge level={finalReport.updated_risk} />
                         <span className="text-sm text-white/70">{(finalReport.updated_confidence * 100).toFixed(1)}% confidence</span>
                       </div>
@@ -432,87 +453,122 @@ export default function StagedDiagnosisPage() {
                   </div>
 
                   {finalReport.initial_vs_final.risk_changed && (
-                    <div className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3">
+                    <div className="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3">
                       <p className="text-sm text-amber-200">
-                        Risk level changed from <strong>{finalReport.initial_vs_final.initial_risk}</strong> to{" "}
-                        <strong>{finalReport.initial_vs_final.final_risk}</strong> after incorporating your follow-up answers.
+                        <strong>Change Noted:</strong> Risk reassessment from <strong>{finalReport.initial_vs_final.initial_risk}</strong> to <strong>{finalReport.initial_vs_final.final_risk}</strong> after reviewing follow-up responses.
                       </p>
+                    </div>
+                  )}
+
+                  {finalReport.evidence_summary.length > 0 && (
+                    <div className="mt-4">
+                      <h3 className="text-sm font-semibold text-white/90">Clinical Context</h3>
+                      <ul className="mt-2 space-y-1">
+                        {finalReport.evidence_summary.map((e, i) => (
+                          <li key={i} className="flex gap-2 text-xs text-white/60">
+                            <span className="shrink-0">→</span> {e}
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   )}
                 </div>
 
-                {/* Evidence */}
-                {finalReport.evidence_summary.length > 0 && (
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl">
-                    <h3 className="mb-4 text-sm font-semibold uppercase tracking-widest text-slate-400">Supporting Evidence</h3>
-                    <ul className="space-y-2">
-                      {finalReport.evidence_summary.map((e, i) => (
-                        <li key={i} className="flex gap-2 text-sm text-white/70">
-                          <span className="mt-0.5 shrink-0 text-cyan-500">&bull;</span> {e}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+                {/* Section 3: Evidence & Context */}
+                <div className="mt-6 border-b border-white/10 pb-6">
+                  <h2 className="text-lg font-bold text-white">Evidence & Context</h2>
+                  
+                  {symptoms.length > 0 && (
+                    <div className="mt-4">
+                      <h3 className="text-sm font-semibold text-cyan-300">Symptoms & Presentation</h3>
+                      <div className="mt-3 space-y-2">
+                        {symptoms.map((s, i) => (
+                          <p key={i} className="text-sm text-white/75 leading-relaxed">{s}</p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
-                {/* Narrative */}
-                {finalReport.llm_narrative && (
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl">
-                    <h3 className="mb-4 text-sm font-semibold uppercase tracking-widest text-slate-400">AI Summary</h3>
-                    <p className="whitespace-pre-line text-sm leading-relaxed text-white/80">{finalReport.llm_narrative}</p>
-                  </div>
-                )}
+                  {support.length > 0 && (
+                    <div className="mt-4">
+                      <h3 className="text-sm font-semibold text-emerald-300">Support & Treatment Options</h3>
+                      <div className="mt-3 space-y-2">
+                        {support.map((s, i) => (
+                          <p key={i} className="text-sm text-white/75 leading-relaxed">{s}</p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
-                {/* Caveats */}
-                {finalReport.missing_caveats.length > 0 && (
-                  <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-6 backdrop-blur-xl">
-                    <h3 className="mb-4 text-sm font-semibold uppercase tracking-widest text-amber-400">Caveats</h3>
-                    <ul className="space-y-2">
-                      {finalReport.missing_caveats.map((c, i) => (
-                        <li key={i} className="flex gap-2 text-sm text-amber-200/80">
-                          <span className="mt-0.5 shrink-0">!</span> {c}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+                  {riskFactors.length > 0 && (
+                    <div className="mt-4">
+                      <h3 className="text-sm font-semibold text-amber-300">Related Risk Factors</h3>
+                      <ul className="mt-3 space-y-1">
+                        {riskFactors.map((rf, i) => (
+                          <li key={i} className="flex gap-2 text-sm text-white/75">
+                            <span className="shrink-0 text-amber-400">•</span> {rf}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
 
-                {/* Recommendations */}
-                {finalReport.recommendations.length > 0 && (
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl">
-                    <h3 className="mb-4 text-sm font-semibold uppercase tracking-widest text-emerald-400">Recommendations</h3>
-                    <ul className="space-y-2">
+                  {otherRag.length > 0 && (
+                    <div className="mt-4">
+                      <h3 className="text-sm font-semibold text-violet-300">Additional Context</h3>
+                      <div className="mt-3 space-y-2">
+                        {otherRag.map((o, i) => (
+                          <p key={i} className="text-sm text-white/75 leading-relaxed">{o}</p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Section 4: Recommendations */}
+                <div className="mt-6 border-b border-white/10 pb-6">
+                  <h2 className="text-lg font-bold text-white">Recommendations</h2>
+                  {finalReport.recommendations.length > 0 ? (
+                    <ul className="mt-3 space-y-2">
                       {finalReport.recommendations.map((r, i) => (
-                        <li key={i} className="flex gap-2 text-sm text-white/70">
-                          <span className="mt-0.5 shrink-0 text-emerald-500">&bull;</span> {r}
+                        <li key={i} className="flex gap-3 text-sm text-white/75">
+                          <span className="mt-0.5 shrink-0 text-emerald-500">✓</span>
+                          <span>{r}</span>
                         </li>
                       ))}
                     </ul>
-                  </div>
-                )}
-
-                {/* Safety Note */}
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl">
-                  <p className="text-xs text-white/40">{finalReport.safety_note}</p>
+                  ) : (
+                    <p className="mt-3 text-sm text-white/60">No specific recommendations at this time.</p>
+                  )}
                 </div>
 
-                {/* Actions */}
-                <div className="flex gap-3">
-                  <button
-                    onClick={handleReset}
-                    className="flex-1 rounded-xl border border-white/20 bg-white/5 px-6 py-4 font-bold text-white transition-all hover:bg-white/10 backdrop-blur-sm"
-                  >
-                    Upload Another Report
-                  </button>
-                  <button
-                    onClick={() => router.push("/results")}
-                    className="rounded-xl border border-cyan-500/30 bg-gradient-to-r from-cyan-600/40 to-blue-600/40 px-6 py-4 font-bold text-white shadow-lg shadow-cyan-500/20 transition-all hover:border-cyan-400/50 backdrop-blur-sm"
-                  >
-                    View Full Results
-                  </button>
+                {/* AI Summary and Caveats */}
+                <div className="mt-6 space-y-4">
+                  {finalReport.llm_narrative && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-300">Clinical Summary</h3>
+                      <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-white/70">{finalReport.llm_narrative}</p>
+                    </div>
+                  )}
+
+                  {finalReport.missing_caveats.length > 0 && (
+                    <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3">
+                      <h3 className="text-sm font-semibold text-amber-300">Important Notes</h3>
+                      <ul className="mt-2 space-y-1">
+                        {finalReport.missing_caveats.map((c, i) => (
+                          <li key={i} className="flex gap-2 text-xs text-amber-100/80">
+                            <span className="shrink-0">⚠</span> {c}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <p className="text-xs italic text-white/40">{finalReport.safety_note}</p>
                 </div>
-              </>
-            )}
+              </article>
+              );
+            })()} 
           </div>
         )}
       </div>
