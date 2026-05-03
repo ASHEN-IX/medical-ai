@@ -265,67 +265,27 @@ class StrokeResponse(BaseModel):
     metadata: Metadata
     request_id: str
 
-# Heart schemas
-class HeartClassProbabilities(BaseModel):
-    heart_disease: float
-    non_heart_disease: float
+
+class ThyroidRequest(BaseModel):
+    model_config = ConfigDict(extra="allow")
 
 
-class HeartPredictionResult(BaseModel):
-    heart_disease: bool
+class ThyroidClassProbabilities(BaseModel):
+    recurrence: float
+    non_recurrence: float
+
+
+class ThyroidPredictionResult(BaseModel):
+    recurrence_detected: bool
     risk_level: Literal["LOW", "MEDIUM", "HIGH"]
     confidence_score: float
-    heart_probability: float
-    class_probabilities: HeartClassProbabilities
+    recurrence_probability: float
+    class_probabilities: ThyroidClassProbabilities
 
 
-class HeartRequest(BaseModel):
-    age: int = Field(..., ge=0, le=120)
-    blood_pressure: float = Field(..., ge=0, le=300)
-    cholesterol: float = Field(..., ge=0, le=1000)
-    bmi: float = Field(..., ge=0, le=100)
-    smoking_status: Optional[str] = None
-
-
-class HeartResponse(BaseModel):
+class ThyroidResponse(BaseModel):
     success: bool = True
-    prediction: HeartPredictionResult
-    recommendations: List[str]
-    metadata: Metadata
-    request_id: str
-
-
-# Liver schemas
-class LiverClassProbabilities(BaseModel):
-    liver_disease: float
-    non_liver_disease: float
-
-
-class LiverPredictionResult(BaseModel):
-    liver_disease: bool
-    risk_level: Literal["LOW", "MEDIUM", "HIGH"]
-    confidence_score: float
-    liver_probability: float
-    class_probabilities: LiverClassProbabilities
-
-
-class LiverRequest(BaseModel):
-    age: int = Field(..., ge=0, le=120)
-    total_bilirubin: float = Field(..., ge=0)
-    direct_bilirubin: float = Field(..., ge=0)
-    alkaline_phosphotase: float = Field(..., ge=0)
-    alanine_aminotransferase: float = Field(..., ge=0)
-    aspartate_aminotransferase: float = Field(..., ge=0)
-    albumin: float = Field(..., ge=0)
-    protime: float = Field(..., ge=0)
-    gender: Optional[str] = None
-    total_protiens: Optional[float] = None
-    albumin_and_globulin_ratio: Optional[float] = None
-
-
-class LiverResponse(BaseModel):
-    success: bool = True
-    prediction: LiverPredictionResult
+    prediction: ThyroidPredictionResult
     recommendations: List[str]
     metadata: Metadata
     request_id: str
