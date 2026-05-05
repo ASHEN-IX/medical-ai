@@ -11,6 +11,8 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from prometheus_fastapi_instrumentator import Instrumentator
+from prometheus_client import Counter, Histogram, Gauge
 
 from app.api.routes.autism_dl import router as autism_dl_router
 from app.api.routes.autism_prediction import router as autism_prediction_router
@@ -36,6 +38,38 @@ logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
 )
 logger = logging.getLogger("ai-service")
+
+# --- Prometheus Metrics ---
+inference_requests_total = Counter(
+    "inference_requests_total",
+    "Total number of inference requests",
+    ["model_id", "status"]
+)
+
+inference_latency_seconds = Histogram(
+    "inference_latency_seconds",
+    "Inference latency in seconds",
+    ["model_id"],
+    buckets=(0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 7.5, 10.0)
+)
+
+inference_errors_total = Counter(
+    "inference_errors_total",
+    "Total number of inference errors",
+    ["model_id", "error_type"]
+)
+
+prediction_confidence_avg = Gauge(
+    "prediction_confidence_avg",
+    "Average prediction confidence",
+    ["model_id"]
+)
+
+drift_alerts_total = Counter(
+    "drift_alerts_total",
+    "Total number of drift alerts detected",
+    ["model_id"]
+)
 
 
 @asynccontextmanager
@@ -187,3 +221,6 @@ app.include_router(report_processing_router, prefix="/api/v1")
 app.include_router(manual_run_router, prefix="/api/v1")
 app.include_router(chat_router, prefix="/api/v1")
 app.include_router(staged_diagnosis_router, prefix="/api/v1")
+
+# Initialize Prometheus Instrumentator
+Instrumentator().instrument(app).expose(app)

@@ -38,12 +38,12 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=4000
-      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/medai_nexus}
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/medai_nexus
       - JWT_SECRET=dev-secret-key-change-in-production
       - JWT_EXPIRATION=3600
-      - NEO4J_URL=${NEO4J_URL:-bolt://neo4j:7687}
-      - NEO4J_USERNAME=${NEO4J_USERNAME:-neo4j}
-      - NEO4J_PASSWORD=${NEO4J_PASSWORD:-neo4j_password}
+      - NEO4J_URL=bolt://neo4j:7687
+      - NEO4J_USERNAME=neo4j
+      - NEO4J_PASSWORD=neo4j_password
       - AI_SERVICE_URL=http://ai-service:8001
       - AI_SERVICE_TIMEOUT_MS=120000
       - REDIS_URL=redis://redis:6379
@@ -155,6 +155,41 @@ services:
     networks:
       - medai-network
 
+  # ===== PROMETHEUS MONITORING =====
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: medai-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - medai-network
+    depends_on:
+      - ai-service
+
+  # ===== GRAFANA DASHBOARDS =====
+  grafana:
+    image: grafana/grafana:latest
+    container_name: medai-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning
+    networks:
+      - medai-network
+    depends_on:
+      - prometheus
+
 networks:
   medai-network:
     driver: bridge
@@ -169,4 +204,8 @@ volumes:
   redis-data:
     driver: local
   ai-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
     driver: local

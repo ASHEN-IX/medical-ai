@@ -195,7 +195,7 @@ export class AiProxyService {
           selectedModels: data.selected_models || [],
           features: payload.features || {},
           symptoms: payload.symptoms || [],
-          results: storedResults,
+          results: JSON.parse(JSON.stringify(storedResults)),
           healthScore,
           riskLevel,
           keyFindings,
@@ -406,7 +406,7 @@ export class AiProxyService {
   private persistCanonicalAutismFlag(response: AiAnalyzeResponse): Record<string, unknown> {
     const results = { ...(response.results || {}) } as Record<string, any>;
     const autismModel = response.model_outputs?.autism_pred || response.model_outputs?.autism_dl;
-    const autismDetected = autismModel?.raw_response?.prediction?.autism_detected;
+    const autismDetected = (autismModel as any)?.raw_response?.prediction?.autism_detected;
 
     if (typeof autismDetected === 'boolean') {
       const autismKey = response.model_outputs?.autism_pred ? 'autism_pred' : 'autism_dl';

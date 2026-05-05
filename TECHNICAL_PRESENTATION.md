@@ -1,170 +1,14 @@
-# MedAI Nexus: AI-Powered Medical Intelligence Platform
+# MedAI Nexus — Reworked Technical Presentation
 
-**Technical Presentation for Academic Jury, Hackathon Judges & Technical Investors**
+**Audience**: Technical judges, reviewers, DevOps engineers, and investor-technical leads
 
----
-
-## Slide 1: Title & Context
-
-### MedAI Nexus
-**Intelligent Medical Analysis with AI-Driven Diagnosis & Clinical Insights**
-
-**Project Status**: ✅ Production Ready  
-**Last Updated**: May 5, 2026  
-**Team**: Full Stack Development Team  
-
-### Presentation Objectives
-1. Demonstrate technical sophistication & completeness
-2. Explain AI/ML innovations driving competitive advantage
-3. Show scalability, security & business viability
-4. Present clinical impact & healthcare transformation
-
-**What You'll Learn**:
-- Problem diagnosis and solution architecture
-- 8-disease ML pipeline with 90.4% average accuracy
-- RAG + Knowledge Graph integration for explainability
-- Complete tech stack: FastAPI + NestJS + Next.js
-- Deployment, security, and scaling strategy
+Last updated: May 5, 2026
 
 ---
 
-## Slide 2: The Medical Diagnosis Problem
+## Executive Summary
 
-### Current State of Medical Diagnostics
-
-**Global Healthcare Challenges**:
-- 📊 **30-40% of diseases** are initially misdiagnosed
-- ⏱️ **1+ hour** required per patient for manual analysis
-- 📋 **Fragmented data** across multiple systems & formats
-- 👨‍⚕️ **Doctor burnout** from repetitive analysis tasks
-- 💰 **High costs** for diagnosis & delayed treatment
-
-### Specific Problems We Solve
-
-**Problem 1: Data Extraction**
-- Medical reports come in multiple formats (PDF, images, scans)
-- Current: Manual data entry (70-80% of doctor's time)
-- Error rate: 5-15% in manual transcription
-- Solution: 99%+ automated extraction with 7 specialized parsers
-
-**Problem 2: Multi-Disease Analysis**
-- Patients often have comorbidities (multiple diseases)
-- Current: Analyze diseases sequentially (30-60 minutes)
-- Doctors miss disease interactions
-- Solution: Simultaneous 8-disease analysis in 2-5 seconds
-
-**Problem 3: Explainability**
-- Black-box ML models reduce doctor trust
-- Current: Just a number without reasoning
-- Solution: LLM-generated clinical explanations grounded in knowledge
-
-**Problem 4: Decision Support**
-- No intelligent routing to correct specialists
-- Current: Manual referral process
-- Solution: AI agent automatically routes to best models/specialists
-
-**Problem 5: Knowledge Integration**
-- Medical literature constantly evolving
-- Current: Static textbooks, outdated information
-- Solution: RAG (Retrieval-Augmented Generation) + Knowledge Graph
-
-### Market Validation
-- 3 major hospitals identified as early adopters
-- 5000+ daily diagnoses performed manually
-- Estimated 40-60% time savings possible
-- Market size: $2-5B in AI medical diagnostics
-
----
-
-## Slide 3: Our Solution Overview
-
-### MedAI Nexus: Complete Solution
-
-**Core Promise**: Transform medical reports into actionable insights in seconds with clinical-grade accuracy and explainable AI.
-
-### Solution Pillars
-
-**1. Intelligent Data Extraction**
-```
-PDF/Image → OCR → 7 Disease Parsers → Structured JSON
-                  ├─ Diabetes
-                  ├─ Heart
-                  ├─ Kidney
-                  ├─ Liver
-                  ├─ Stroke
-                  ├─ Thyroid
-                  └─ Autism
-Success Rate: 99%+ | Time: <1 sec
-```
-
-**2. Multi-Disease AI Prediction**
-```
-Structured Data → 8 Parallel ML Models → Unified Risk Assessment
-├─ Random Forest (diabetes)
-├─ Logistic Regression (heart)
-├─ Gradient Boosting (kidney)
-├─ SVM (liver)
-├─ XGBoost (stroke)
-├─ Neural Network (thyroid)
-├─ Deep Learning (autism survey)
-└─ CNN (autism images)
-
-Accuracy: 90.4% avg | Time: <100ms
-```
-
-**3. Knowledge-Enriched Explanations**
-```
-Predictions + Medical Knowledge + Graph Reasoning → Clinical Insights
-├─ RAG: Retrieve latest evidence from 49 knowledge chunks
-├─ Graph: Query 300+ node relationships
-└─ LLM: Generate doctor-friendly explanations
-Factual Accuracy: 99.2% | Time: 1-2 sec
-```
-
-**4. Immersive User Experience**
-```
-3D Dashboard → Interactive Visualization → Decision Support
-├─ Holographic risk panels
-├─ Real-time graph rendering
-├─ Animated transitions
-└─ Mobile-responsive design
-
-Engagement: 3x higher vs traditional dashboards
-```
-
-### How It Works (User Perspective)
-
-```
-1. Doctor uploads medical report (PDF/image)
-   ↓
-2. System extracts patient data (2-3 sec)
-   ↓
-3. AI analyzes across 8 disease models simultaneously
-   ↓
-4. Knowledge graph enriches predictions with context
-   ↓
-5. LLM generates clinical explanations
-   ↓
-6. 3D dashboard visualizes results interactively
-   ↓
-7. Doctor reviews findings & makes informed decisions
-
-Total Time: 5-10 seconds | Result: Comprehensive medical intelligence
-```
-
-### Competitive Positioning
-
-| Dimension | MedAI Nexus | Competitors |
-|-----------|-----------|------------|
-| **Diseases** | 8 simultaneous | 1-2 sequential |
-| **Speed** | 2-5 sec | 30-60 sec |
-| **Accuracy** | 90.4% | 75-85% |
-| **Explainability** | RAG+Graph+LLM | Basic rules |
-| **UX** | 3D immersive | Static tables |
-| **Data Extraction** | 99% automatic | 70% manual |
-
----
-
+... (rest of reworked content inserted here) ...
 ## Slide 4: System Vision & Innovation Narrative
 
 ### The Vision
@@ -512,6 +356,89 @@ System can process:
 3. **Parallel processing** keeps latency under 5 seconds
 4. **Explainability** at each step builds doctor trust
 5. **Extensibility** - add new models/knowledge without redesign
+
+---
+
+## Slide 6A: CRISP-DM Process & Tooling
+
+### How we followed CRISP-DM end-to-end (concise guide)
+
+1. Business Understanding
+   - Objectives: accurate multi-disease screening, explainability, low-latency inference
+   - Stakeholders: physicians, hospitals, data engineers, regulators
+   - Tools: project board (GitHub issues), requirements docs ([DOCUMENTS/](documents))
+
+2. Data Understanding
+   - Source: hospital EHR extracts, hospital CSVs, annotated reports
+   - Tools: Python (`pandas`, `pyarrow`), exploratory notebooks, summary stats, clinician review
+
+3. Data Preparation
+   - OCR: `Tesseract` + post-processing to fix artifacts
+   - Parsers: disease-specific regexes, context heuristics, unit normalization
+   - Tools: Python, `numpy`, `pandas`, custom extraction scripts in `ai-service/app/services`
+
+4. Modeling
+   - Model families: tree-based (XGBoost, RandomForest), linear (LogisticRegression, SVM), neural nets (PyTorch/TensorFlow)
+   - Tools: `scikit-learn`, `xgboost`, `PyTorch`, `TensorFlow`, `ONNX` for runtime portability
+   - Experiment tracking: `MLflow` or S3 + metadata (git commit, dataset fingerprint)
+
+5. Evaluation
+   - Metrics: accuracy, precision, recall, AUC, calibration, clinical review
+   - Tools: cross-validation, holdout test sets, hospital pilot validations, confusion matrices
+
+6. Deployment
+   - Packaging: model artifact + preprocessor + manifest
+   - Serving: FastAPI microservices, ONNXRuntime/Triton where appropriate
+   - Orchestration: Docker, Helm, Kubernetes; CI with GitHub Actions
+   - Monitoring: Prometheus, Grafana, logging, drift detection
+
+7. Maintenance & Feedback Loop
+   - Continuous monitoring, data labeling loop, periodic retraining, governance
+   - Tools: scheduled retrain pipelines, model registry, alerts & rollback
+
+---
+
+## Slide 6B: Machine Learning Methodology
+
+### ML approach and reproducibility
+
+- Feature engineering: domain rules, interaction terms, missing-value strategies, unit normalization
+- Model selection: per-disease algorithm chosen by performance and interpretability tradeoffs
+- Hyperparameter tuning: grid search / Bayesian optimization (Optuna) with cross-validation
+- Ensembles & stacking: reduce variance and improve robustness where appropriate
+- Explainability: feature importance, SHAP-like analysis, per-prediction feature attributions
+- Reproducibility: containerized training environments, artifact manifests, dataset fingerprints
+- Validation: clinical holdout sets and hospital pilots before production rollout
+
+See Slide 7 for per-model algorithms and accuracy metrics.
+
+---
+
+## Slide 6C: Other AI Components & Integrations
+
+### RAG, Knowledge Graph, LLMs, Parsers, and Orchestration
+
+- RAG (Retrieval-Augmented Generation):
+  - Embeddings (sentence-transformers) → FAISS index for semantic retrieval
+  - Top-K evidence retrieval feeds LLM prompt to ground responses
+
+- Knowledge Graph (Neo4j):
+  - Domain schema: Diseases, Symptoms, Treatments, Contraindications
+  - Use: contextual reasoning, contraindication checks, comorbidity insights
+
+- LLM Integration:
+  - Use LLMs for explanation generation with strict grounding prompts
+  - LLMs consume predictions + retrieved evidence + graph insights
+
+- Parsers & OCR:
+  - Robust, disease-specific parsers live in `ai-service/app/services`
+  - OCR: Tesseract + heuristics for stamps/signatures and multi-language support
+
+- Model Integration & Serving (summary):
+  - `model_loader` + adapters normalize inputs, expose standard `/predict` interface
+  - CI validation: schema checks and sample inference tests before model promotion
+
+---
 
 ---
 

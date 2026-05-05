@@ -11,6 +11,7 @@ import { AiProxyModule } from './modules/ai-proxy/ai-proxy.module';
 import { DoctorRequestsModule } from './modules/doctor-requests/doctor-requests.module';
 import { DoctorReviewsModule } from './modules/doctor-reviews/doctor-reviews.module';
 import { MessagesModule } from './modules/messages/messages.module';
+import { MetricsModule } from './modules/metrics/metrics.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { MessagesModule } from './modules/messages/messages.module';
     DoctorRequestsModule,
     DoctorReviewsModule,
     MessagesModule,
+    MetricsModule,
   ],
 })
 export class AppModule {}

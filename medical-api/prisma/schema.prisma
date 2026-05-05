@@ -253,3 +253,23 @@ model Log {
   @@index([action])
   @@index([createdAt])
 }
+
+model PredictionLog {
+  id                String   @id @default(uuid())
+  reportId          String
+  modelId           String
+  modelVersion      String
+  inputFeatures     Json
+  prediction        Json
+  confidence        Float
+  processingTimeMs  Float
+  driftDetected     Boolean  @default(false)
+  driftAlerts       Json?
+  metadata          Json?
+  createdAt         DateTime @default(now())
+
+  @@index([reportId])
+  @@index([modelId])
+  @@index([createdAt])
+  @@index([driftDetected])
+}
