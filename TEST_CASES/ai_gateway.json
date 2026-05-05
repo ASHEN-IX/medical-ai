@@ -1,0 +1,83 @@
+{
+  "model": "ai_gateway",
+  "endpoint": "POST /api/v1/ai/analyze",
+  "description": "AI Gateway unified analysis endpoint. Routes medical reports and clinical data to multiple specialized models for comprehensive risk assessment.",
+  "request_schema": {
+    "report_type": { "type": "string", "enum": ["auto", "diabetes", "heart", "kidney", "stroke", "autism", "mixed"], "default": "auto", "description": "Type of medical report or auto-detect" },
+    "features": { "type": "dict", "description": "Clinical features/measurements (arbitrary key-value pairs)" },
+    "raw_text": { "type": "string", "optional": true, "description": "Raw OCR text from medical report" },
+    "include_explanation": { "type": "boolean", "default": true, "description": "Include LLM-generated explanations in response" },
+    "symptoms": { "type": "array of strings", "optional": true, "description": "List of reported symptoms" },
+    "image": { "type": "string", "optional": true, "description": "Base64-encoded medical image" }
+  },
+  "example_diabetes_screening": {
+    "report_type": "diabetes",
+    "features": {
+      "glucose": 180,
+      "bmi": 32.5,
+      "age": 55
+    },
+    "symptoms": ["excessive thirst", "frequent urination", "unexplained weight loss"],
+    "include_explanation": true
+  },
+  "example_cardiac_screening": {
+    "report_type": "heart",
+    "features": {
+      "blood_pressure": 150,
+      "cholesterol": 280,
+      "age": 60
+    },
+    "symptoms": ["chest pain", "shortness of breath", "palpitations"],
+    "include_explanation": true
+  },
+  "example_multi_disease": {
+    "report_type": "mixed",
+    "features": {
+      "age": 58,
+      "blood_pressure": 160,
+      "glucose": 200,
+      "creatinine": 1.8,
+      "bmi": 35
+    },
+    "symptoms": ["fatigue", "blurred vision", "chest discomfort"],
+    "include_explanation": true
+  },
+  "example_with_ocr_text": {
+    "report_type": "auto",
+    "raw_text": "Patient: 55M. BP: 150/90. Glucose: 180. Total Cholesterol: 280. Creatinine: 1.5. BMI: 32. History of hypertension for 10 years. Smoker.",
+    "features": {
+      "age": 55,
+      "gender": "M"
+    },
+    "symptoms": ["fatigue", "polyuria"],
+    "include_explanation": true
+  },
+  "response_includes": {
+    "success": "boolean - whether analysis succeeded",
+    "request_id": "unique request identifier",
+    "inputs": "echo of input parameters",
+    "extracted_features": "parsed features from raw text/images",
+    "model_outputs": "individual model predictions (diabetes, heart, kidney, stroke, thyroid, autism)",
+    "rag_context": "relevant medical knowledge retrieved from knowledge base",
+    "kg_insights": "related symptoms, treatments, complications from knowledge graph",
+    "risk_assessment": "integrated risk analysis across all models",
+    "llm_explanation": "natural language explanation of findings",
+    "final_decision": "recommended next steps",
+    "results": "aggregated risk levels",
+    "final_assessment": "overall risk and priority level",
+    "metadata": "processing time, timestamp"
+  },
+  "extraction_pipeline": {
+    "description": "AI Gateway automatically detects report type and routes to appropriate parsers",
+    "step_1_ocr": "Convert medical report image/PDF to text using OCR service",
+    "step_2_routing": "Detect disease type (diabetes, heart, kidney, liver, stroke, thyroid, autism) using routing engine",
+    "step_3_parse": "Route raw text to appropriate parser (diabetes_parser, heart_parser, etc.)",
+    "step_4_extract": "Extract structured fields with validation and fallback defaults",
+    "step_5_model": "Submit extracted data to disease-specific ML model",
+    "step_6_enrich": "Enhance with RAG medical knowledge and knowledge graph insights",
+    "step_7_explain": "Generate LLM clinical explanation"
+  },
+  "example_ocr_to_structured": {
+    "input_format": "raw_text from medical report",
+    "raw_text": \"COMPREHENSIVE MEDICAL EXAMINATION\\nPatient Demographics: Age 58, Male\\nLab Results: Glucose 145 mg/dL, BP 155/95 mmHg, Total Cholesterol 265 mg/dL, Creatinine 1.6 mg/dL, Albumin 3.8 g/dL\\nAnthropometry: BMI 33.2 kg/m2\\nVital Signs: HR 88, RR 16\\nRisk Factors: Hypertension (yes), Smoking (current), Family History: Heart disease\\nAssessment: Multiple metabolic abnormalities with elevated cardiovascular and renal risk\",\n    \"auto_detection\": {\n      \"detected_diseases\": [\"diabetes\", \"heart_disease\", \"kidney_disease\"],\n      \"primary_type\": \"mixed\",\n      \"confidence\": 0.92\n    },\n    \"parser_outputs\": {\n      \"diabetes_parser\": {\n        \"glucose\": 145,\n        \"bmi\": 33.2,\n        \"age\": 58\n      },\n      \"heart_parser\": {\n        \"age\": 58,\n        \"blood_pressure\": 155,\n        \"cholesterol\": 265,\n        \"bmi\": 33.2\n      },\n      \"kidney_parser\": {\n        \"age\": 58,\n        \"sc\": 1.6,\n        \"al\": 0,\n        \"htn\": 1\n      }\n    },\n    \"unified_analysis\": {\n      \"diabetes_risk\": \"MEDIUM\",\n      \"heart_risk\": \"MEDIUM\",\n      \"kidney_risk\": \"LOW\",\n      \"overall_risk\": \"MEDIUM\",\n      \"priority\": \"Requires intervention\"\n    }\n  }
+}

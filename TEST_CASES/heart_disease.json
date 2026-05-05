@@ -1,0 +1,39 @@
+{
+  "model": "heart_disease",
+  "endpoint": "POST /api/v1/heart/predict",
+  "description": "Coronary Artery Disease prediction model. Requires cardiovascular risk factors.",
+  "fields": {
+    "age": { "type": "integer", "range": [1, 120], "unit": "years", "description": "Patient age in years" },
+    "blood_pressure": { "type": "float", "range": [0, 300], "unit": "mmHg", "description": "Systolic blood pressure" },
+    "cholesterol": { "type": "float", "range": [0, 600], "unit": "mg/dL", "description": "Total serum cholesterol" },
+    "bmi": { "type": "float", "range": [10, 60], "unit": "kg/m²", "description": "Body mass index" }
+  },
+  "example_low_risk": {
+    "age": 35,
+    "blood_pressure": 110,
+    "cholesterol": 180,
+    "bmi": 22.5
+  },
+  "example_medium_risk": {
+    "age": 50,
+    "blood_pressure": 140,
+    "cholesterol": 240,
+    "bmi": 28.0
+  },
+  "example_high_risk": {
+    "age": 70,
+    "blood_pressure": 170,
+    "cholesterol": 320,
+    "bmi": 32.5
+  },
+  "extraction_example": {
+    "raw_text": "Cardiovascular Screening Report. Patient: 70M. Vital Signs: BP 170 mmHg, HR 88. Labs: Total Cholesterol 320 mg/dL. Anthropometry: BMI 32.5 kg/m². Risk Factors: Hypertension, Elevated cholesterol, Obesity. ECG: Nonspecific changes. Assessment: High risk for coronary artery disease.",
+    "extracted_to": {
+      "age": 70,
+      "blood_pressure": 170,
+      "cholesterol": 320,
+      "bmi": 32.5
+    },
+    "parser": "ai-service/app/services/heart_parser.py"
+  }
+}

@@ -289,3 +289,67 @@ class ThyroidResponse(BaseModel):
     recommendations: List[str]
     metadata: Metadata
     request_id: str
+
+
+# Heart Disease schemas
+class HeartRequest(BaseModel):
+    age: int = Field(..., ge=1, le=120)
+    blood_pressure: float = Field(..., ge=0, le=300)
+    cholesterol: float = Field(..., ge=0, le=600)
+    bmi: float = Field(..., ge=10, le=60)
+
+
+class HeartClassProbabilities(BaseModel):
+    heart_disease: float
+    non_heart_disease: float
+
+
+class HeartPredictionResult(BaseModel):
+    heart_disease: bool
+    risk_level: Literal["LOW", "MEDIUM", "HIGH"]
+    confidence_score: float
+    heart_probability: float
+    class_probabilities: HeartClassProbabilities
+
+
+class HeartResponse(BaseModel):
+    success: bool = True
+    prediction: HeartPredictionResult
+    recommendations: List[str]
+    metadata: Metadata
+    request_id: str
+
+
+# Liver Disease schemas
+class LiverRequest(BaseModel):
+    age: int = Field(..., ge=1, le=120)
+    gender: str = Field(..., pattern="^[MmFf]$|^[Mm]ale$|^[Ff]emale$")
+    total_bilirubin: float = Field(..., ge=0, le=30)
+    direct_bilirubin: float = Field(..., ge=0, le=20)
+    alkaline_phosphotase: float = Field(..., ge=0, le=1500)
+    alanine_aminotransferase: float = Field(..., ge=0, le=2000)
+    aspartate_aminotransferase: float = Field(..., ge=0, le=5000)
+    total_protiens: Optional[float] = Field(default=None, ge=0, le=10)
+    albumin: float = Field(..., ge=0, le=6)
+    albumin_and_globulin_ratio: Optional[float] = Field(default=None, ge=0, le=3)
+
+
+class LiverClassProbabilities(BaseModel):
+    liver_disease: float
+    non_liver_disease: float
+
+
+class LiverPredictionResult(BaseModel):
+    liver_disease: bool
+    risk_level: Literal["LOW", "MEDIUM", "HIGH"]
+    confidence_score: float
+    liver_probability: float
+    class_probabilities: LiverClassProbabilities
+
+
+class LiverResponse(BaseModel):
+    success: bool = True
+    prediction: LiverPredictionResult
+    recommendations: List[str]
+    metadata: Metadata
+    request_id: str

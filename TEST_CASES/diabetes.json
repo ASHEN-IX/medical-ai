@@ -1,0 +1,59 @@
+{
+  "model": "diabetes",
+  "endpoint": "POST /api/v1/diabetes/predict",
+  "description": "Type 2 Diabetes Mellitus prediction model. Requires pregnancy history, metabolic markers, and anthropometric measurements (Pima Indians Diabetes Database).",
+  "fields": {
+    "pregnancies": { "type": "integer", "range": [0, 20], "description": "Number of times pregnant" },
+    "glucose": { "type": "float", "range": [0, 250], "unit": "mg/dL", "description": "Plasma glucose concentration 2 hours after oral glucose tolerance test" },
+    "blood_pressure": { "type": "float", "range": [0, 140], "unit": "mmHg", "description": "Diastolic blood pressure" },
+    "skin_thickness": { "type": "float", "range": [0, 100], "unit": "mm", "description": "Triceps skin fold thickness" },
+    "insulin": { "type": "float", "range": [0, 900], "unit": "mu U/ml", "description": "2-Hour serum insulin" },
+    "bmi": { "type": "float", "range": [0, 70], "unit": "kg/m²", "description": "Body mass index" },
+    "diabetes_pedigree_function": { "type": "float", "range": [0, 3], "description": "Diabetes pedigree function (genetic predisposition)" },
+    "age": { "type": "integer", "range": [1, 120], "unit": "years", "description": "Age in years" }
+  },
+  "example_low_risk": {
+    "pregnancies": 0,
+    "glucose": 100,
+    "blood_pressure": 70,
+    "skin_thickness": 20,
+    "insulin": 50,
+    "bmi": 23.5,
+    "diabetes_pedigree_function": 0.25,
+    "age": 30
+  },
+  "example_medium_risk": {
+    "pregnancies": 2,
+    "glucose": 140,
+    "blood_pressure": 90,
+    "skin_thickness": 35,
+    "insulin": 150,
+    "bmi": 31.0,
+    "diabetes_pedigree_function": 0.5,
+    "age": 45
+  },
+  "example_high_risk": {
+    "pregnancies": 5,
+    "glucose": 200,
+    "blood_pressure": 110,
+    "skin_thickness": 50,
+    "insulin": 300,
+    "bmi": 38.5,
+    "diabetes_pedigree_function": 1.2,
+    "age": 60
+  },
+  "extraction_example": {
+    "raw_text": "Patient: 60-year-old female. Obstetric History: 5 pregnancies. Lab Results: Fasting Glucose 200 mg/dL, Blood Pressure 110/70 mmHg, Triceps Skin Fold 50mm, Serum Insulin 300 mU/ml, BMI 38.5 kg/m², Diabetes Pedigree Function 1.2. Assessment: Marked hyperglycemia with obesity and significant family history.",
+    "extracted_to": {
+      "pregnancies": 5,
+      "glucose": 200,
+      "blood_pressure": 110,
+      "skin_thickness": 50,
+      "insulin": 300,
+      "bmi": 38.5,
+      "diabetes_pedigree_function": 1.2,
+      "age": 60
+    },
+    "parser": "ai-service/app/services/diabetes_parser.py"
+  }
+}

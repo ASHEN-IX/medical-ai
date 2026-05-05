@@ -1,0 +1,34 @@
+{
+  "disease": "liver_disease",
+  "source": "WHO + CDC Viral Hepatitis & CLD Summary",
+  "chunks": [
+    {
+      "type": "overview",
+      "text": "Liver disease encompasses any condition that causes liver inflammation or tissue damage, potentially leading to cirrhosis, liver failure, or hepatocellular carcinoma."
+    },
+    {
+      "type": "epidemiology",
+      "text": "Chronic liver disease affects millions worldwide, with Metabolic Dysfunction-Associated Steatotic Liver Disease (MASLD) becoming the fastest-growing subtype due to rising global obesity rates."
+    },
+    {
+      "type": "symptoms",
+      "text": "Patients may experience jaundice (yellowing of eyes/skin), abdominal pain and swelling, dark urine color, and chronic fatigue or itchy skin."
+    },
+    {
+      "type": "causes",
+      "text": "Major causes include viral hepatitis (A, B, C), chronic alcohol consumption, and metabolic factors leading to non-alcoholic fatty liver buildup."
+    },
+    {
+      "type": "diagnosis",
+      "text": "Clinicians use Liver Function Tests (LFTs) to measure enzymes, along with imaging like ultrasound or FibroScan, and occasionally a tissue biopsy."
+    },
+    {
+      "type": "treatment",
+      "text": "Treatment focuses on the cause: antivirals for hepatitis, lifestyle interventions for fatty liver, or corticosteroids for autoimmune cases. End-stage disease requires liver transplantation."
+    },
+    {
+      "type": "prevention",
+      "text": "Key actions include vaccination against Hepatitis A and B, limiting alcohol intake, and maintaining metabolic health through diet to prevent fatty liver accumulation."
+    }
+  ]
+}

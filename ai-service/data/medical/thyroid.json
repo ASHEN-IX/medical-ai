@@ -1,0 +1,34 @@
+{
+  "disease": "thyroid_disorder",
+  "source": "WHO + American Thyroid Association (ATA)",
+  "chunks": [
+    {
+      "type": "overview",
+      "text": "Thyroid disorders occur when the thyroid gland produces too much (hyperthyroidism) or too little (hypothyroidism) hormone, disrupting the body's metabolic rate."
+    },
+    {
+      "type": "epidemiology",
+      "text": "An estimated 200 million people worldwide have some form of thyroid disease. Women are five to eight times more likely than men to experience thyroid dysfunction."
+    },
+    {
+      "type": "symptoms",
+      "text": "Hypothyroidism causes fatigue, weight gain, and cold intolerance. Hyperthyroidism presents as rapid heart rate, weight loss, anxiety, and heat sensitivity."
+    },
+    {
+      "type": "causes",
+      "text": "Autoimmune conditions like Hashimoto's (low) or Graves' (high) are primary causes. Iodine deficiency remains a significant cause in developing regions, while nodules or inflammation are also common."
+    },
+    {
+      "type": "diagnosis",
+      "text": "Diagnosis is confirmed via blood tests measuring Thyroid-Stimulating Hormone (TSH) and Free T4 levels. Ultrasound is used to evaluate physical nodules."
+    },
+    {
+      "type": "treatment",
+      "text": "Hypothyroidism is managed with daily synthetic hormone (Levothyroxine). Hyperthyroidism treatments include anti-thyroid medications, radioactive iodine, or surgery."
+    },
+    {
+      "type": "prevention",
+      "text": "While many cases are autoimmune, ensuring adequate dietary iodine intake and avoiding excessive radiation exposure to the neck area are standard protective measures."
+    }
+  ]
+}

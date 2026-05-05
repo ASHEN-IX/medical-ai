@@ -1,0 +1,34 @@
+{
+  "disease": "diabetes_mellitus",
+  "source": "WHO + CDC + Mayo Clinic (2026 Update)",
+  "chunks": [
+    {
+      "type": "overview",
+      "text": "Diabetes is a chronic metabolic condition where the body cannot effectively regulate blood glucose levels due to insufficient insulin production or resistance. If left unmanaged, high blood sugar causes systemic damage to nerves, blood vessels, and vital organs."
+    },
+    {
+      "type": "epidemiology",
+      "text": "Approximately 537 million adults globally live with diabetes, a number projected to rise to 783 million by 2045. Type 2 accounts for over 90% of cases, primarily driven by aging populations and lifestyle shifts."
+    },
+    {
+      "type": "symptoms",
+      "text": "Common indicators include polyuria (frequent urination), polydipsia (excessive thirst), unexplained weight loss, blurred vision, and slow-healing wounds or frequent infections."
+    },
+    {
+      "type": "causes",
+      "text": "Type 1 is an autoimmune reaction destroying insulin-producing beta cells. Type 2 results from a complex interaction of genetic predisposition, obesity, physical inactivity, and insulin resistance."
+    },
+    {
+      "type": "diagnosis",
+      "text": "Standard clinical diagnosis relies on the A1C test (measuring 3-month average glucose), Fasting Plasma Glucose (FPG) tests, or Oral Glucose Tolerance Tests (OGTT)."
+    },
+    {
+      "type": "treatment",
+      "text": "Management includes exogenous insulin for Type 1 and a combination of lifestyle changes, metformin, or SGLT2 inhibitors for Type 2 to prevent cardiovascular and renal complications."
+    },
+    {
+      "type": "prevention",
+      "text": "Risk reduction focuses on maintaining a healthy BMI, performing 150 minutes of moderate aerobic activity weekly, and adopting a diet rich in fiber while low in processed sugars."
+    }
+  ]
+}

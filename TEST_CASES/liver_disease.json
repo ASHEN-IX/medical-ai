@@ -1,0 +1,69 @@
+{
+  "model": "liver_disease",
+  "endpoint": "POST /api/v1/liver-disease/predict",
+  "description": "Liver Disease prediction model. Requires liver function tests and enzyme markers.",
+  "fields": {
+    "age": { "type": "integer", "range": [1, 120], "unit": "years", "description": "Patient age in years" },
+    "gender": { "type": "string", "enum": ["M", "F", "Male", "Female", "m", "f"], "description": "Gender (M/F or Male/Female)" },
+    "total_bilirubin": { "type": "float", "range": [0, 30], "unit": "mg/dL", "description": "Total serum bilirubin" },
+    "direct_bilirubin": { "type": "float", "range": [0, 20], "unit": "mg/dL", "description": "Direct (conjugated) bilirubin" },
+    "alkaline_phosphotase": { "type": "float", "range": [0, 1500], "unit": "U/L", "description": "Alkaline phosphatase enzyme" },
+    "alanine_aminotransferase": { "type": "float", "range": [0, 2000], "unit": "U/L", "description": "ALT (SGPT) enzyme" },
+    "aspartate_aminotransferase": { "type": "float", "range": [0, 5000], "unit": "U/L", "description": "AST (SGOT) enzyme" },
+    "total_protiens": { "type": "float", "range": [0, 10], "unit": "g/dL", "description": "Total serum protein (optional)" },
+    "albumin": { "type": "float", "range": [0, 6], "unit": "g/dL", "description": "Serum albumin" },
+    "albumin_and_globulin_ratio": { "type": "float", "range": [0, 3], "description": "Albumin-to-globulin ratio (optional)" }
+  },
+  "example_low_risk": {
+    "age": 30,
+    "gender": "M",
+    "total_bilirubin": 0.7,
+    "direct_bilirubin": 0.2,
+    "alkaline_phosphotase": 64,
+    "alanine_aminotransferase": 33,
+    "aspartate_aminotransferase": 32,
+    "total_protiens": 7.5,
+    "albumin": 4.5,
+    "albumin_and_globulin_ratio": 1.2
+  },
+  "example_medium_risk": {
+    "age": 50,
+    "gender": "F",
+    "total_bilirubin": 1.2,
+    "direct_bilirubin": 0.4,
+    "alkaline_phosphotase": 100,
+    "alanine_aminotransferase": 80,
+    "aspartate_aminotransferase": 85,
+    "total_protiens": 7.0,
+    "albumin": 3.8,
+    "albumin_and_globulin_ratio": 1.0
+  },
+  "example_high_risk": {
+    "age": 65,
+    "gender": "M",
+    "total_bilirubin": 3.5,
+    "direct_bilirubin": 2.1,
+    "alkaline_phosphotase": 250,
+    "alanine_aminotransferase": 200,
+    "aspartate_aminotransferase": 280,
+    "total_protiens": 5.8,
+    "albumin": 2.5,
+    "albumin_and_globulin_ratio": 0.7
+  },
+  "extraction_example": {
+    "raw_text": "Liver Function Tests. Patient: 65-year-old Male. Total Bilirubin 3.5 mg/dL, Direct Bilirubin 2.1 mg/dL (cholestasis), Alkaline Phosphatase 250 U/L (elevated), ALT (SGPT) 200 U/L (markedly elevated), AST (SGOT) 280 U/L (hepatocellular pattern), Total Proteins 5.8 g/dL (low), Albumin 2.5 g/dL (low), A/G Ratio 0.7 (inverted). Ultrasound: Cirrhotic liver. Assessment: Advanced cirrhosis with hepatic dysfunction.",
+    "extracted_to": {
+      "age": 65,
+      "gender": "M",
+      "total_bilirubin": 3.5,
+      "direct_bilirubin": 2.1,
+      "alkaline_phosphotase": 250,
+      "alanine_aminotransferase": 200,
+      "aspartate_aminotransferase": 280,
+      "total_protiens": 5.8,
+      "albumin": 2.5,
+      "albumin_and_globulin_ratio": 0.7
+    },
+    "parser": "ai-service/app/services/liver_parser.py"
+  }
+}

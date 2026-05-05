@@ -1,0 +1,124 @@
+{
+  "model": "autism_prediction",
+  "endpoint": "POST /api/v1/autism-pred/predict",
+  "description": "Autism Spectrum Disorder survey-based prediction model. Requires M-CHAT survey responses and demographic information.",
+  "fields": {
+    "survey_responses": {
+      "A1_Score": { "type": "integer", "range": [0, 1], "description": "Does the child look at you when you call his/her name?" },
+      "A2_Score": { "type": "integer", "range": [0, 1], "description": "How easy is it for you to get eye contact with the child?" },
+      "A3_Score": { "type": "integer", "range": [0, 1], "description": "Does the child point with one finger to show you something interesting?" },
+      "A4_Score": { "type": "integer", "range": [0, 1], "description": "Does the child bring toys to you and/or bring you things they have found?" },
+      "A5_Score": { "type": "integer", "range": [0, 1], "description": "Do you think your child understands what you say?" },
+      "A6_Score": { "type": "integer", "range": [0, 1], "description": "When something unusual happens, does the child look at your face to see your reaction?" },
+      "A7_Score": { "type": "integer", "range": [0, 1], "description": "Does the child like movement activities (e.g., being swung, bounced on your knee)?" },
+      "A8_Score": { "type": "integer", "range": [0, 1], "description": "Does the child imitate you (e.g., you make a face - does your child imitate it)?" },
+      "A9_Score": { "type": "integer", "range": [0, 1], "description": "Does the child say any words on his/her own?" },
+      "A10_Score": { "type": "integer", "range": [0, 1], "description": "Does the child repeat words after you?" }
+    },
+    "demographics": {
+      "age": { "type": "integer", "range": [0, 120], "unit": "months", "description": "Age of child in months" },
+      "gender": { "type": "string", "enum": ["m", "f"], "description": "Gender (m=male, f=female)" },
+      "ethnicity": { "type": "integer/string", "description": "Ethnicity code or name" },
+      "jaundice": { "type": "integer/string", "description": "History of jaundice (0=no, 1=yes)" },
+      "relation": { "type": "integer/string", "enum": ["Self", "Parent", "Relative", "Health care professional", "Others"], "description": "Relation of respondent to child" },
+      "austim": { "type": "integer/string", "description": "Family history of autism (0=no, 1=yes)" },
+      "used_app_before": { "type": "integer/string", "description": "Has used app before (0=no, 1=yes)" }
+    }
+  },
+  "example_low_risk": {
+    "responses": {
+      "A1_Score": 0,
+      "A2_Score": 0,
+      "A3_Score": 0,
+      "A4_Score": 0,
+      "A5_Score": 0,
+      "A6_Score": 0,
+      "A7_Score": 0,
+      "A8_Score": 0,
+      "A9_Score": 0,
+      "A10_Score": 0
+    },
+    "demographics": {
+      "gender": "m",
+      "age": 24,
+      "ethnicity": "White-European",
+      "jaundice": 0,
+      "relation": "Parent",
+      "austim": 0,
+      "used_app_before": 0
+    }
+  },
+  "example_medium_risk": {
+    "responses": {
+      "A1_Score": 0,
+      "A2_Score": 1,
+      "A3_Score": 0,
+      "A4_Score": 1,
+      "A5_Score": 0,
+      "A6_Score": 1,
+      "A7_Score": 0,
+      "A8_Score": 1,
+      "A9_Score": 0,
+      "A10_Score": 0
+    },
+    "demographics": {
+      "gender": "f",
+      "age": 30,
+      "ethnicity": "Asian",
+      "jaundice": 0,
+      "relation": "Parent",
+      "austim": 1,
+      "used_app_before": 0
+    }
+  },
+  "example_high_risk": {
+    "responses": {
+      "A1_Score": 1,
+      "A2_Score": 1,
+      "A3_Score": 1,
+      "A4_Score": 1,
+      "A5_Score": 1,
+      "A6_Score": 1,
+      "A7_Score": 1,
+      "A8_Score": 1,
+      "A9_Score": 1,
+      "A10_Score": 1
+    },
+    "demographics": {
+      "gender": "m",
+      "age": 36,
+      "ethnicity": "Hispanic",
+      "jaundice": 1,
+      "relation": "Parent",
+      "austim": 1,
+      "used_app_before": 1
+    }
+  },
+  "extraction_example": {
+    "raw_text": "M-CHAT Screening Form (English). Child Age: 36 months. Gender: Male. Ethnicity: Hispanic. Jaundice at Birth: Yes. Relation of Respondent: Parent. Prior Screening App: Yes. Family History of Autism: Yes. Q1: Does the child look at you when you call his/her name? Yes. Q2: How easy is it for you to get eye contact? No. Q3: Does the child point with one finger? Yes. Q4: Does child bring toys to show you? No. Q5: Does child understand what you say? Yes. Q6: When unusual happens, does child look at your face? No. Q7: Does child like movement activities? Yes. Q8: Does child imitate you? No. Q9: Does child say any words? Yes. Q10: Does child repeat words? No.",
+    "extracted_to": {
+      "responses": {
+        "A1_Score": 0,
+        "A2_Score": 1,
+        "A3_Score": 0,
+        "A4_Score": 1,
+        "A5_Score": 0,
+        "A6_Score": 1,
+        "A7_Score": 0,
+        "A8_Score": 1,
+        "A9_Score": 0,
+        "A10_Score": 1
+      },
+      "demographics": {
+        "gender": "m",
+        "age": 36,
+        "ethnicity": "Hispanic",
+        "jaundice": 1,
+        "relation": "Parent",
+        "austim": 1,
+        "used_app_before": 1
+      }
+    },
+    "parser": "ai-service/app/services/autism_parser.py"
+  }
+}

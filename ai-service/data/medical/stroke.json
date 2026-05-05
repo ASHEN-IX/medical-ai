@@ -1,0 +1,34 @@
+{
+  "disease": "stroke",
+  "source": "WHO + WSO + Mayo Clinic Clinical Guide",
+  "chunks": [
+    {
+      "type": "overview",
+      "text": "A stroke occurs when the blood supply to part of the brain is interrupted or reduced, depriving brain tissue of oxygen and causing cell death within minutes."
+    },
+    {
+      "type": "epidemiology",
+      "text": "One in four adults over age 25 will have a stroke in their lifetime. It is a leading cause of long-term disability and the second leading cause of death globally."
+    },
+    {
+      "type": "symptoms",
+      "text": "Common signs follow the FAST acronym: Facial drooping, Arm weakness, Speech difficulty, and Time to call emergency services. Sudden severe headaches and vision loss are also frequent."
+    },
+    {
+      "type": "causes",
+      "text": "Ischemic strokes (87% of cases) are caused by blood clots, while hemorrhagic strokes result from ruptured vessels. Major risk factors include untreated hypertension and atrial fibrillation."
+    },
+    {
+      "type": "diagnosis",
+      "text": "Immediate diagnosis is performed via CT or MRI scans to differentiate between clot-based and bleed-based strokes, which determines the emergency treatment path."
+    },
+    {
+      "type": "treatment",
+      "text": "Ischemic strokes are treated with thrombolytic drugs (clot-busters) or mechanical thrombectomy. Hemorrhagic strokes focus on controlling bleeding and reducing intracranial pressure."
+    },
+    {
+      "type": "prevention",
+      "text": "Managing high blood pressure is the single most effective way to prevent stroke. Other measures include anticoagulation for heart rhythm issues and smoking cessation."
+    }
+  ]
+}

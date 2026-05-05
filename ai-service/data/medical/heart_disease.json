@@ -1,0 +1,34 @@
+{
+  "disease": "heart_disease",
+  "source": "WHO + AHA/ACC 2026 Statistical Update",
+  "chunks": [
+    {
+      "type": "overview",
+      "text": "Heart disease refers to a range of conditions affecting the heart, most commonly coronary artery disease, which involves the narrowing of vessels that supply blood to the heart muscle."
+    },
+    {
+      "type": "epidemiology",
+      "text": "Cardiovascular disease (CVD) remains the leading cause of death globally, claiming nearly 20 million lives annually. Prevalence is increasing in low-income regions due to the rapid adoption of sedentary lifestyles."
+    },
+    {
+      "type": "symptoms",
+      "text": "Symptoms vary but often include chest pain (angina), shortness of breath, palpitations, and fatigue. Some individuals remain asymptomatic until a myocardial infarction (heart attack) occurs."
+    },
+    {
+      "type": "causes",
+      "text": "Primary drivers include atherosclerosis, high blood pressure, elevated LDL cholesterol, and smoking. Emerging 2026 data also highlights the role of chronic inflammation and sleep deprivation."
+    },
+    {
+      "type": "diagnosis",
+      "text": "Diagnosis involves Electrocardiograms (ECG), stress testing, echocardiography, and cardiac catheterization or CT scans to visualize artery blockages."
+    },
+    {
+      "type": "treatment",
+      "text": "First-line treatments involve statins for cholesterol and ACE inhibitors for blood pressure. Advanced cases may require percutaneous coronary intervention (PCI) or bypass surgery."
+    },
+    {
+      "type": "prevention",
+      "text": "Prevention centers on 'Life's Essential 8'—managing blood pressure, cholesterol, and blood sugar while prioritizing physical activity, healthy sleep, and smoking cessation."
+    }
+  ]
+}

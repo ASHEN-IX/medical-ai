@@ -73,6 +73,11 @@ class ModelLoader:
         self.kidney_scaler: Any | None = None
         self.kidney_feature_names: list[str] = []
         self.kidney_label_encoder: Any | None = None
+        self.heart_model: Any | None = None
+        self.heart_preprocessor: Any | None = None
+        self.liver_model: Any | None = None
+        self.liver_scaler: Any | None = None
+        self.liver_label_encoder: Any | None = None
         self.prediction_encoders: dict[str, Any] = {}
         self.feature_columns: list[str] = []
 
@@ -82,6 +87,8 @@ class ModelLoader:
             "diabetes_pred": "v1.0",
             "kidney_pred": "v1.0",
             "stroke_pred": "v1.0",
+            "heart_pred": "v1.0",
+            "liver_pred": "v1.0",
             "thyroid_pred": "v1.0",
         }
         self.model_response_times_ms = {
@@ -90,6 +97,8 @@ class ModelLoader:
             "diabetes_pred": 0,
             "kidney_pred": 0,
             "stroke_pred": 0,
+            "heart_pred": 0,
+            "liver_pred": 0,
             "thyroid_pred": 0,
         }
         self.load_errors: dict[str, str] = {}
@@ -105,6 +114,11 @@ class ModelLoader:
             "kidney_label_encoder": None,
             "stroke_model": None,
             "stroke_scaler": None,
+            "heart_model": None,
+            "heart_preprocessor": None,
+            "liver_model": None,
+            "liver_scaler": None,
+            "liver_label_encoder": None,
             "thyroid_model": None,
         }
 
@@ -168,6 +182,8 @@ class ModelLoader:
             self._load_diabetes_model()
             self._load_kidney_disease_model()
             self._load_stroke_model()
+            self._load_heart_model()
+            self._load_liver_model()
             self._load_thyroid_model()
             if self.load_errors:
                 for model_key, reason in self.load_errors.items():
@@ -496,6 +512,149 @@ class ModelLoader:
             self.load_errors["thyroid_pred"] = f"Failed to load thyroid model: {exc}"
             logger.exception("Failed to load thyroid model from %s", model_path)
 
+    def _load_heart_model(self) -> None:
+        model_path = self._resolve_existing_path(
+            [
+                self.models_root / "heart-disease" / "heart_model.joblib",
+                self.models_root / "heart_model.joblib",
+                self.project_root / "models" / "heart-disease" / "heart_model.joblib",
+                self.project_root / "legacy" / "heart" / "models" / "heart_model.joblib",
+            ]
+        )
+        preprocessor_path = self._resolve_existing_path(
+            [
+                self.models_root / "heart-disease" / "preprocessor.joblib",
+                self.models_root / "preprocessor.joblib",
+                self.project_root / "models" / "heart-disease" / "preprocessor.joblib",
+                self.project_root / "legacy" / "heart" / "models" / "preprocessor.joblib",
+            ]
+        )
+
+        self._paths["heart_model"] = str(model_path) if model_path else None
+        self._paths["heart_preprocessor"] = str(preprocessor_path) if preprocessor_path else None
+
+        if model_path is None:
+            self.heart_model = None
+            self.heart_preprocessor = None
+            self.load_errors["heart_pred"] = "Heart model file heart_model.joblib not found"
+            logger.warning("Heart model file not found")
+            return
+
+        artifact_error = self._validate_artifact(model_path, "Heart model")
+        if artifact_error is not None:
+            self.heart_model = None
+            self.heart_preprocessor = None
+            self.load_errors["heart_pred"] = artifact_error
+            logger.error(artifact_error)
+            return
+
+        try:
+            self.heart_model = self._load_pickle_like(model_path)
+            logger.info("Loaded heart model from %s", model_path)
+        except Exception as exc:
+            self.heart_model = None
+            self.heart_preprocessor = None
+            self.load_errors["heart_pred"] = f"Failed to load heart model: {exc}"
+            logger.exception("Failed to load heart model from %s", model_path)
+            return
+
+        if preprocessor_path is not None:
+            preprocessor_error = self._validate_artifact(preprocessor_path, "Heart preprocessor")
+            if preprocessor_error is not None:
+                self.heart_preprocessor = None
+                logger.warning("%s; proceeding without preprocessor", preprocessor_error)
+            else:
+                try:
+                    self.heart_preprocessor = self._load_pickle_like(preprocessor_path)
+                    logger.info("Loaded heart preprocessor from %s", preprocessor_path)
+                except Exception as exc:
+                    self.heart_preprocessor = None
+                    logger.warning("Failed to load heart preprocessor: %s; proceeding without it", exc)
+
+    def _load_liver_model(self) -> None:
+        model_path = self._resolve_existing_path(
+            [
+                self.models_root / "liver-disease" / "liver_best_model.pkl",
+                self.models_root / "liver_best_model.pkl",
+                self.project_root / "models" / "liver-disease" / "liver_best_model.pkl",
+                self.project_root / "legacy" / "liver" / "models" / "liver_best_model.pkl",
+            ]
+        )
+        scaler_path = self._resolve_existing_path(
+            [
+                self.models_root / "liver-disease" / "scaler.pkl",
+                self.models_root / "scaler.pkl",
+                self.project_root / "models" / "liver-disease" / "scaler.pkl",
+                self.project_root / "legacy" / "liver" / "models" / "scaler.pkl",
+            ]
+        )
+        label_encoder_path = self._resolve_existing_path(
+            [
+                self.models_root / "liver-disease" / "label_encoder_gender.pkl",
+                self.models_root / "label_encoder_gender.pkl",
+                self.project_root / "models" / "liver-disease" / "label_encoder_gender.pkl",
+                self.project_root / "legacy" / "liver" / "models" / "label_encoder_gender.pkl",
+            ]
+        )
+
+        self._paths["liver_model"] = str(model_path) if model_path else None
+        self._paths["liver_scaler"] = str(scaler_path) if scaler_path else None
+        self._paths["liver_label_encoder"] = str(label_encoder_path) if label_encoder_path else None
+
+        if model_path is None:
+            self.liver_model = None
+            self.liver_scaler = None
+            self.liver_label_encoder = None
+            self.load_errors["liver_pred"] = "Liver model file liver_best_model.pkl not found"
+            logger.warning("Liver model file not found")
+            return
+
+        artifact_error = self._validate_artifact(model_path, "Liver model")
+        if artifact_error is not None:
+            self.liver_model = None
+            self.liver_scaler = None
+            self.liver_label_encoder = None
+            self.load_errors["liver_pred"] = artifact_error
+            logger.error(artifact_error)
+            return
+
+        try:
+            self.liver_model = self._load_pickle_like(model_path)
+            logger.info("Loaded liver model from %s", model_path)
+        except Exception as exc:
+            self.liver_model = None
+            self.liver_scaler = None
+            self.liver_label_encoder = None
+            self.load_errors["liver_pred"] = f"Failed to load liver model: {exc}"
+            logger.exception("Failed to load liver model from %s", model_path)
+            return
+
+        if scaler_path is not None:
+            scaler_error = self._validate_artifact(scaler_path, "Liver scaler")
+            if scaler_error is not None:
+                self.liver_scaler = None
+                logger.warning("%s; proceeding without scaler", scaler_error)
+            else:
+                try:
+                    self.liver_scaler = self._load_pickle_like(scaler_path)
+                    logger.info("Loaded liver scaler from %s", scaler_path)
+                except Exception as exc:
+                    self.liver_scaler = None
+                    logger.warning("Failed to load liver scaler: %s; proceeding without it", exc)
+
+        if label_encoder_path is not None:
+            label_encoder_error = self._validate_artifact(label_encoder_path, "Liver label encoder")
+            if label_encoder_error is not None:
+                self.liver_label_encoder = None
+                logger.warning("%s; proceeding without label encoder", label_encoder_error)
+            else:
+                try:
+                    self.liver_label_encoder = self._load_pickle_like(label_encoder_path)
+                    logger.info("Loaded liver label encoder from %s", label_encoder_path)
+                except Exception as exc:
+                    self.liver_label_encoder = None
+                    logger.warning("Failed to load liver label encoder: %s; proceeding without it", exc)
+
     def record_response_time(self, model_key: str, duration_ms: int) -> None:
         if model_key in self.model_response_times_ms:
             self.model_response_times_ms[model_key] = max(0, int(duration_ms))
@@ -506,6 +665,8 @@ class ModelLoader:
         diabetes_loaded = self.diabetes_model is not None
         kidney_loaded = self.kidney_disease_model is not None and self.kidney_scaler is not None
         stroke_loaded = self.stroke_model is not None
+        heart_loaded = self.heart_model is not None
+        liver_loaded = self.liver_model is not None
         thyroid_loaded = self.thyroid_model is not None
 
         return {
@@ -535,6 +696,16 @@ class ModelLoader:
                     status="loaded" if stroke_loaded else "not_loaded",
                     version=self.model_versions["stroke_pred"],
                     response_time_ms=self.model_response_times_ms["stroke_pred"],
+                ),
+                "heart_pred": ModelHealth(
+                    status="loaded" if heart_loaded else "not_loaded",
+                    version=self.model_versions["heart_pred"],
+                    response_time_ms=self.model_response_times_ms["heart_pred"],
+                ),
+                "liver_pred": ModelHealth(
+                    status="loaded" if liver_loaded else "not_loaded",
+                    version=self.model_versions["liver_pred"],
+                    response_time_ms=self.model_response_times_ms["liver_pred"],
                 ),
                 "thyroid_pred": ModelHealth(
                     status="loaded" if thyroid_loaded else "not_loaded",

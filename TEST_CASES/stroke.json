@@ -1,0 +1,59 @@
+{
+  "model": "stroke",
+  "endpoint": "POST /api/v1/stroke/predict",
+  "description": "Stroke (Cerebrovascular Accident) prediction model. Requires demographic and cardiovascular risk factors.",
+  "fields": {
+    "age": { "type": "float", "range": [0, 120], "unit": "years", "description": "Patient age in years" },
+    "hypertension": { "type": "integer", "enum": [0, 1], "description": "History of hypertension (0=no, 1=yes)" },
+    "heart_disease": { "type": "integer", "enum": [0, 1], "description": "History of heart disease (0=no, 1=yes)" },
+    "bmi": { "type": "float", "range": [0, 60], "unit": "kg/m²", "description": "Body mass index" },
+    "ever_married": { "type": "string", "enum": ["Yes", "No"], "description": "Ever been married (Yes/No)" },
+    "work_type": { "type": "string", "enum": ["Self-employed", "children", "Private", "Govt_job", "Never_worked"], "description": "Type of employment" },
+    "smoking_status": { "type": "string", "enum": ["Unknown", "formerly smoked", "never smoked", "smokes"], "description": "Current/past smoking status" },
+    "avg_glucose_level": { "type": "float", "range": [0, 300], "unit": "mg/dL", "description": "Average blood glucose level" }
+  },
+  "example_low_risk": {
+    "age": 35,
+    "hypertension": 0,
+    "heart_disease": 0,
+    "bmi": 24.5,
+    "ever_married": "No",
+    "work_type": "Private",
+    "smoking_status": "never smoked",
+    "avg_glucose_level": 95
+  },
+  "example_medium_risk": {
+    "age": 55,
+    "hypertension": 1,
+    "heart_disease": 0,
+    "bmi": 28.5,
+    "ever_married": "Yes",
+    "work_type": "Private",
+    "smoking_status": "formerly smoked",
+    "avg_glucose_level": 130
+  },
+  "example_high_risk": {
+    "age": 75,
+    "hypertension": 1,
+    "heart_disease": 1,
+    "bmi": 32.5,
+    "ever_married": "Yes",
+    "work_type": "Self-employed",
+    "smoking_status": "smokes",
+    "avg_glucose_level": 190
+  },
+  "extraction_example": {
+    "raw_text": "Stroke Risk Assessment. Patient: 75-year-old married male. Occupational Status: Self-employed. Hypertension: Yes (on medications). Heart Disease History: Yes (previous MI). BMI: 32.5 kg/m² (obese). Smoking Status: Currently smokes (1 pack/day). Average Glucose Level: 190 mg/dL (hyperglycemic). Assessment: High-risk profile with multiple modifiable and non-modifiable stroke risk factors.",
+    "extracted_to": {
+      "age": 75,
+      "hypertension": 1,
+      "heart_disease": 1,
+      "bmi": 32.5,
+      "ever_married": "Yes",
+      "work_type": "Self-employed",
+      "smoking_status": "smokes",
+      "avg_glucose_level": 190
+    },
+    "parser": "ai-service/app/services/stroke_parser.py"
+  }
+}

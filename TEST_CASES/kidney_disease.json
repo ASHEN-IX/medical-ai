@@ -1,0 +1,54 @@
+{
+  "model": "kidney_disease",
+  "endpoint": "POST /api/v1/kidney-disease/predict",
+  "description": "Chronic Kidney Disease prediction model. Requires clinical blood/urine markers and vital signs.",
+  "fields": {
+    "age": { "type": "float", "range": [0, 120], "unit": "years", "description": "Patient age in years" },
+    "hemo": { "type": "float", "range": [0, 25], "unit": "g/dL", "description": "Hemoglobin level" },
+    "sg": { "type": "float", "range": [1.0, 1.05], "unit": "specific gravity", "description": "Specific gravity of urine" },
+    "al": { "type": "integer", "range": [0, 5], "unit": "none", "description": "Albumin level (0=absent, 5=severe)" },
+    "pcv": { "type": "float", "range": [0, 60], "unit": "%", "description": "Packed cell volume (hematocrit)" },
+    "sc": { "type": "float", "range": [0, 20], "unit": "mg/dL", "description": "Serum creatinine" },
+    "htn": { "type": "integer", "enum": [0, 1], "description": "Hypertension (0=no, 1=yes)" }
+  },
+  "example_low_risk": {
+    "age": 25.0,
+    "hemo": 13.5,
+    "sg": 1.02,
+    "al": 0,
+    "pcv": 42.0,
+    "sc": 0.8,
+    "htn": 0
+  },
+  "example_medium_risk": {
+    "age": 45.0,
+    "hemo": 11.5,
+    "sg": 1.015,
+    "al": 1,
+    "pcv": 38.0,
+    "sc": 1.5,
+    "htn": 1
+  },
+  "example_high_risk": {
+    "age": 65.0,
+    "hemo": 8.5,
+    "sg": 1.01,
+    "al": 3,
+    "pcv": 28.0,
+    "sc": 3.8,
+    "htn": 1
+  },
+  "extraction_example": {
+    "raw_text": "Renal Function Assessment. Age: 65 years. Labs: Hemoglobin 8.5 g/dL (anemia), Urine Specific Gravity 1.01, Albumin 3+ (severe proteinuria), Packed Cell Volume 28%, Serum Creatinine 3.8 mg/dL (elevated). History: Hypertension (yes). Assessment: Chronic kidney disease Stage 4 with anemia.",
+    "extracted_to": {
+      "age": 65.0,
+      "hemo": 8.5,
+      "sg": 1.01,
+      "al": 3,
+      "pcv": 28.0,
+      "sc": 3.8,
+      "htn": 1
+    },
+    "parser": "ai-service/app/services/kidney_parser.py"
+  }
+}
