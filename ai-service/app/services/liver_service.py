@@ -181,7 +181,8 @@ class LiverService:
             liver_prob = float(prediction_raw) if isinstance(prediction_raw, (int, float)) else 0.0
 
         liver_prob = max(0.0, min(1.0, liver_prob))
-        liver_detected = bool(prediction_raw) and liver_prob >= 0.5
+        # Use binary prediction (0 or 1) directly for disease detection, not probability threshold
+        liver_detected = bool(prediction_raw == 1)
         confidence = liver_prob if liver_detected else 1.0 - liver_prob
 
         duration_ms = int((time.time() - started) * 1000)

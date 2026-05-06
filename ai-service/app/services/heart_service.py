@@ -164,7 +164,8 @@ class HeartService:
                 heart_prob = float(prediction_raw) if isinstance(prediction_raw, (int, float)) else 0.0
 
         heart_prob = max(0.0, min(1.0, heart_prob))
-        heart_detected = bool(prediction_raw) and heart_prob >= 0.5
+        # Use binary prediction (0 or 1) directly for disease detection, not probability threshold
+        heart_detected = bool(prediction_raw == 1)
         confidence = heart_prob if heart_detected else 1.0 - heart_prob
 
         duration_ms = int((time.time() - started) * 1000)

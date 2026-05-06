@@ -113,8 +113,10 @@ class KidneyDiseaseService:
                         or class_map.get("yes")
                         or class_map.get("positive")
                     )
+                    # If still None, use index-based lookup for class 1 probability
                     if ckd_prob is None:
-                        ckd_prob = float(np.max(probs)) if predicted_is_ckd else float(np.min(probs))
+                        # Always use probs[1] when CKD detected (binary prediction=1)
+                        ckd_prob = float(probs[1]) if predicted_is_ckd else float(probs[0])
                 else:
                     ckd_prob = float(probs[1])
             elif probs.ndim == 1 and probs.size == 1:
@@ -142,17 +144,19 @@ class KidneyDiseaseService:
         try:
             scaled_input = scaler.transform(feature_frame)
             prediction_raw = model.predict(scaled_input)[0]
+            # Ensure binary classification - round to nearest 0 or 1
+            binary_prediction = int(round(float(prediction_raw)))
         except Exception as exc:  # pragma: no cover - runtime dependency behavior
             logger.exception("Kidney model inference failed")
             raise RuntimeError("Model inference failed") from exc
 
         label_encoder = model_loader.kidney_label_encoder
-        decoded_label: Any = prediction_raw
+        decoded_label: Any = binary_prediction
         if label_encoder is not None:
             try:
-                decoded_label = label_encoder.inverse_transform([int(prediction_raw)])[0]
+                decoded_label = label_encoder.inverse_transform([int(binary_prediction)])[0]
             except Exception:  # pragma: no cover - runtime dependency behavior
-                decoded_label = prediction_raw
+                decoded_label = binary_prediction
 
         ckd_detected = self._is_ckd_label(decoded_label)
         ckd_prob, non_ckd_prob = self._probabilities(model, scaled_input, ckd_detected)

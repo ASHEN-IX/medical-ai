@@ -82,8 +82,10 @@ class DiabetesService:
                         or class_map.get("yes")
                         or class_map.get("positive")
                     )
+                    # If still None, use index-based lookup for class 1 probability
                     if diabetes_prob is None:
-                        diabetes_prob = float(np.max(probs)) if diabetic else float(np.min(probs))
+                        # Always use probs[1] when diabetic (binary prediction=1)
+                        diabetes_prob = float(probs[1]) if diabetic else float(probs[0])
                 else:
                     diabetes_prob = float(probs[1])
             elif probs.ndim == 1 and probs.size == 1:
@@ -108,11 +110,13 @@ class DiabetesService:
 
         try:
             prediction_raw = model.predict(feature_frame)[0]
+            # Ensure binary classification - round to nearest 0 or 1
+            binary_prediction = int(round(float(prediction_raw)))
         except Exception as exc:  # pragma: no cover - runtime dependency behavior
             logger.exception("Diabetes model inference failed")
             raise RuntimeError("Model inference failed") from exc
 
-        diabetic = self._is_diabetes_label(prediction_raw)
+        diabetic = self._is_diabetes_label(binary_prediction)
         diabetes_prob, non_diabetes_prob = self._probabilities(model, feature_frame, diabetic)
         confidence = diabetes_prob if diabetic else non_diabetes_prob
         risk_level = self._risk_level(diabetes_prob)

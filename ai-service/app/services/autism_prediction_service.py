@@ -221,7 +221,7 @@ class AutismPredictionService:
 
         try:
             prediction_raw = model.predict(input_frame)[0]
-            predicted_label = int(prediction_raw)
+            predicted_label = int(round(float(prediction_raw)))  # Ensure binary classification (0 or 1)
         except Exception:  # pylint: disable=broad-except
             predicted_label = 1
 
@@ -239,11 +239,12 @@ class AutismPredictionService:
 
         autism_probability = max(0.0, min(1.0, autism_probability))
         non_autism_probability = max(0.0, min(1.0, non_autism_probability))
+        # Use predicted_label (which is binary) for confidence, not the probability
         confidence = autism_probability if predicted_label == 1 else non_autism_probability
         risk_level = self._risk_level_from_probability(autism_probability)
         risk_categories = self._risk_categories(payload.responses)
         recommendations = self._recommendations(risk_level)
-        autism_detected = autism_probability >= 0.5
+        autism_detected = predicted_label == 1  # Use binary prediction label, not probability threshold
 
         duration_ms = int((time.perf_counter() - started) * 1000)
         model_loader.record_response_time("autism_pred", duration_ms)

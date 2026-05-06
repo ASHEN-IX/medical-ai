@@ -90,8 +90,10 @@ class ThyroidService:
                         or class_map.get("recurrent")
                         or class_map.get("true")
                     )
+                    # If still None, use index-based lookup for class 1 probability
                     if recurrence_prob is None:
-                        recurrence_prob = float(np.max(probs)) if recurrence_detected else float(np.min(probs))
+                        # Always use probs[1] when recurrence detected (binary prediction=1)
+                        recurrence_prob = float(probs[1]) if recurrence_detected else float(probs[0])
                 else:
                     recurrence_prob = float(probs[1])
             elif probs.ndim == 1 and probs.size == 1:
