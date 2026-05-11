@@ -126,6 +126,8 @@ export interface SubmitAnswersResponse {
   stage: string;
   enriched_features: Record<string, unknown>;
   feature_count: number;
+  next_questions: FollowUpQuestion[];
+  needs_more_questions: boolean;
 }
 
 export interface FinalReportPayload {
@@ -157,6 +159,9 @@ export interface AiChatResponse {
   sources?: string[];
 }
 
+import { CaseAssignmentsService } from '../case-assignments/case-assignments.service';
+import { AlertsService } from '../alerts/alerts.service';
+
 @Injectable()
 export class AiProxyService {
   private readonly logger = new Logger(AiProxyService.name);
@@ -165,6 +170,8 @@ export class AiProxyService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
+    private readonly caseAssignments: CaseAssignmentsService,
+    private readonly alerts: AlertsService,
   ) {
     const baseURL =
       this.configService.get<string>('AI_SERVICE_URL') || 'http://localhost:8001';
@@ -241,14 +248,14 @@ export class AiProxyService {
 
   async chat(payload: AiChatPayload): Promise<AiChatResponse> {
     try {
-      const { data } = await this.aiClient.post<AiChatResponse>(
-        '/api/v1/rag/retrieve',
-        {
-          query: payload.message,
-          context: payload.analysis_context,
-          chat_history: payload.history,
-        },
-      );
+      // Use the AI service chat endpoint which provides an LLM response
+      // and optional RAG sources. This aligns with the AI service `/api/v1/chat` route.
+      const { data } = await this.aiClient.post<AiChatResponse>('/api/v1/chat', {
+        message: payload.message,
+        analysis_context: payload.analysis_context,
+        history: payload.history,
+      });
+
       return { response: data.response || String(data), sources: data.sources };
     } catch (error) {
       this.logger.error('AI chat failed', error);
@@ -297,6 +304,17 @@ export class AiProxyService {
         '/api/v1/diagnosis/analyze',
         payload,
       );
+
+      // Persist session in DB for state management & audit
+      await this.prisma.stagedDiagnosis.create({
+        data: {
+          patientId: userId,
+          disease: data.selected_disease || (payload.report_type as string) || 'auto',
+          initialReportId: null, // Could be linked if reportId was in payload
+          metadata: { aiSessionId: data.session_id, initialResult: data } as any,
+          currentStep: 1,
+        },
+      });
 
       await this.prisma.log.create({
         data: {
@@ -364,6 +382,69 @@ export class AiProxyService {
         '/api/v1/diagnosis/final-report',
         payload,
       );
+
+      // Update DB session state
+      const session = await this.prisma.stagedDiagnosis.findFirst({
+        where: { 
+          patientId: userId,
+          metadata: { path: ['aiSessionId'], equals: payload.session_id }
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      if (session) {
+        await this.prisma.stagedDiagnosis.update({
+          where: { id: session.id },
+          data: {
+            isCompleted: true,
+            metadata: { ...(session.metadata as any), finalReport: data } as any,
+          }
+        });
+
+        // --- Clinical Automation ---
+        if (data.updated_risk === 'HIGH' || data.updated_risk === 'CRITICAL') {
+          // 1. Auto-assign specialist
+          // 1. Create analysis record for tracking
+          try {
+            const analysis = await this.prisma.analysis.create({
+              data: {
+                userId,
+                testName: session.disease,
+                selectedModels: ['staged'],
+                features: session.answers || {},
+                results: data as any,
+                riskLevel: data.updated_risk as any,
+                status: 'COMPLETED',
+                keyFindings: [`Staged diagnosis completed for ${session.disease}`],
+                aiInsights: `Final risk assessment: ${data.updated_risk}. Confidence: ${(data as any).confidence || 'N/A'}`
+              }
+            });
+
+            // 2. Auto-assign specialist
+            await this.caseAssignments.autoAssign({
+              patientId: userId,
+              analysisId: analysis.id,
+              disease: session.disease,
+              priority: data.updated_risk === 'CRITICAL' ? 'EMERGENCY' : data.updated_risk === 'HIGH' ? 'URGENT' : 'NORMAL',
+              notes: `Staged diagnosis completed with ${data.updated_risk} risk.`,
+            });
+          } catch (err) {
+            this.logger.error('Auto-assignment failed after staged diagnosis', err);
+          }
+
+          // 2. Trigger risk alert
+          try {
+            await this.alerts.triggerRiskAlert(
+              userId,
+              session.disease,
+              data.updated_risk as any,
+              data.updated_confidence,
+            );
+          } catch (err) {
+            this.logger.error('Risk alert failed after staged diagnosis', err);
+          }
+        }
+      }
 
       await this.prisma.log.create({
         data: {

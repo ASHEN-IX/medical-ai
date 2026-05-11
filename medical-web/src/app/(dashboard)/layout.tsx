@@ -7,19 +7,29 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AIAnalysisProvider } from "@/hooks/useAIAnalysis";
 import { useAuth } from "@/hooks/useAuth";
-import { fetchUnreadCount } from "@/services/api";
+import { fetchUnreadCount, fetchAlertUnreadCount } from "@/services/api";
 
 const patientNav = [
   { href: "/diagnosis", label: "Diagnosis" },
-  { href: "/upload", label: "Make your test" },
+  { href: "/manual-tests", label: "Manual Tests" },
   { href: "/results", label: "Results" },
+  { href: "/chat", label: "AI Assistant" },
+  { href: "/appointments", label: "Appointments" },
+  { href: "/medications", label: "Medications" },
+  { href: "/alerts", label: "Alerts" },
+  { href: "/prevention-plan", label: "Prevention" },
+  { href: "/transportation", label: "Transport" },
+  { href: "/consultation-history", label: "Consultation Panel" },
   { href: "/history", label: "History" },
 ];
 
 const doctorNav = [
   { href: "/doctor", label: "Queue" },
   { href: "/doctor/reviews", label: "Reviews" },
+  { href: "/appointments", label: "Appointments" },
   { href: "/diagnosis", label: "Diagnosis" },
+  { href: "/medications", label: "Prescriptions" },
+  { href: "/consultation-history", label: "Consultation Panel" },
   { href: "/history", label: "History" },
 ];
 
@@ -70,11 +80,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`rounded-lg px-3 py-1.5 transition ${
-                      isActive
+                    className={`rounded-lg px-3 py-1.5 transition ${isActive
                         ? "bg-cyan-500/20 text-cyan-300"
                         : "text-slate-400 hover:bg-white/10 hover:text-white"
-                    }`}
+                      }`}
                   >
                     {item.label}
                   </Link>
@@ -83,11 +92,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
               <Link
                 href="/messages"
-                className={`relative rounded-lg px-3 py-1.5 transition ${
-                  pathname === "/messages"
+                className={`relative rounded-lg px-3 py-1.5 transition ${pathname === "/messages"
                     ? "bg-cyan-500/20 text-cyan-300"
                     : "text-slate-400 hover:bg-white/10 hover:text-white"
-                }`}
+                  }`}
               >
                 Messages
                 {unreadCount > 0 && (

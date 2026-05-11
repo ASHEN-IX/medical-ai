@@ -15,6 +15,7 @@ services:
     environment:
       - NEXT_PUBLIC_AI_GATEWAY_URL=http://localhost:8001
       - NEXT_PUBLIC_API_URL=http://localhost:4000
+      - NEXT_PUBLIC_SOCKET_URL=http://localhost:4000
       - NEXT_PUBLIC_APP_NAME=MedAI Nexus
       - NODE_ENV=development
     volumes:
@@ -38,7 +39,7 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=4000
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/medai_nexus
+      - DATABASE_URL=postgresql://neondb_owner:npg_Qqz0ofdAWMu4@ep-sparkling-thunder-alrrp5fn-pooler.c-3.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
       - JWT_SECRET=dev-secret-key-change-in-production
       - JWT_EXPIRATION=3600
       - NEO4J_URL=bolt://neo4j:7687
@@ -80,11 +81,11 @@ services:
       - GROQ_MODEL=${GROQ_MODEL:-openai/gpt-oss-120b}
       - SENTENCE_TRANSFORMERS_HOME=/data/sentence_transformers
       - OPENAI_API_KEY=${OPENAI_API_KEY:-sk-test-key}
-      - GEMINI_API_KEY=${GEMINI_API_KEY:-AIzaSyD5kzQNK3un8Mt4veMHUFxu0XBkAvJKRpQ}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-AIzaSyBUmOQJRFXd2MZLLBnjcmeSnLaGy8eQ0nI}
       - NEO4J_URL=${NEO4J_URL:-bolt://neo4j:7687}
       - NEO4J_USERNAME=${NEO4J_USERNAME:-neo4j}
       - NEO4J_PASSWORD=${NEO4J_PASSWORD:-neo4j_password}
-      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/medai_nexus}
+      - DATABASE_URL=postgresql://neondb_owner:npg_Qqz0ofdAWMu4@ep-sparkling-thunder-alrrp5fn-pooler.c-3.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
       - FAISS_DATA_PATH=/data/faiss
       - MODELS_PATH=/models
     volumes:

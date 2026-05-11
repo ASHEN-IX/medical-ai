@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 
 import "./globals.css";
 import { AuthProvider } from "@/hooks/useAuth";
+import { SocketProvider } from "@/context/SocketContext";
 
 const displayFont = Space_Grotesk({
   subsets: ["latin"],
@@ -27,7 +28,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className="dark">
       <body className={`${displayFont.variable} ${bodyFont.variable} antialiased`}>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <SocketProvider>{children}</SocketProvider>
+        </AuthProvider>
       </body>
     </html>
   );

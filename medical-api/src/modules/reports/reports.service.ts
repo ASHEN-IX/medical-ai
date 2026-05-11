@@ -7,12 +7,16 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateReportDto } from './dto/create-report.dto';
 import { MedicalReport, UserRole } from '@prisma/client';
+import { FamilyConsentService } from '../family-consent/family-consent.service';
 
 @Injectable()
 export class ReportsService {
   private readonly logger = new Logger(ReportsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly familyConsent: FamilyConsentService,
+  ) {}
 
   async createReport(
     userId: string,
@@ -82,7 +86,11 @@ export class ReportsService {
       userRole !== UserRole.DOCTOR &&
       userRole !== UserRole.ADMIN
     ) {
-      throw new ForbiddenException('Access denied');
+      // Check for caregiver consent
+      const hasConsent = await this.familyConsent.checkAccess(report.userId, userId);
+      if (!hasConsent) {
+        throw new ForbiddenException('Access denied');
+      }
     }
 
     return report;

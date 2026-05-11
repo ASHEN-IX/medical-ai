@@ -28,9 +28,7 @@ dependencies = [
     "PyPDF2>=3.0.1",
     "spacy>=3.7.2",
     "nltk>=3.8.1",
-    "python-multipart>=0.0.6Logout
-Logout
-",
+    "python-multipart>=0.0.6",
     "requests>=2.31.0",
     "httpx>=0.25.0",
 ]

@@ -66,7 +66,7 @@ DISEASE_TEMPLATES: dict[str, str] = {
 
 # Fields that MUST be non-default for the JSON to be considered "filled"
 REQUIRED_NON_ZERO: dict[str, list[str]] = {
-    "autism":   [f"A{i}_Score" for i in range(1, 110)],
+    "autism":   [f"A{i}_Score" for i in range(1, 11)],
     "diabetes": ["Glucose", "Age"],
     "heart":    ["age", "blood_pressure"],
     "liver":    ["age", "total_bilirubin"],
@@ -239,8 +239,16 @@ def _coerce_types(disease: str, data: dict[str, Any]) -> dict[str, Any]:
     """Coerce extracted values to match template types."""
     template = _load_template(disease)
     result: dict[str, Any] = {}
+    
+    # Create a case-insensitive lookup for the input data
+    data_lookup = {str(k).lower(): v for k, v in data.items()}
+    
     for key, default in template.items():
-        val = data.get(key, default)
+        # Try exact match first, then case-insensitive
+        val = data.get(key)
+        if val is None:
+            val = data_lookup.get(str(key).lower(), default)
+            
         try:
             if isinstance(default, int):
                 result[key] = int(float(str(val))) if val not in ("", None) else default
@@ -467,10 +475,11 @@ class GeminiExtractor:
         """Delegate to the appropriate legacy parser."""
         template = _load_template(disease)
 
-        if disease == "autism":
-            try:
-                import sys
-                sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+        try:
+            import sys
+            sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+            if disease == "autism":
                 from app.services.autism_parser import parse_autism_prediction_request  # type: ignore[import]
                 parsed = parse_autism_prediction_request(raw_text)
                 responses = parsed.responses.model_dump()
@@ -486,10 +495,41 @@ class GeminiExtractor:
                 data["result"] = float(sum(responses.get(f"A{i}_Score", 0) for i in range(1, 11)))
                 data["relation"] = str(demographics.get("relation") or "")
                 return _coerce_types(disease, data)
-            except Exception as exc:
-                logger.warning("Autism legacy parser failed: %s", exc)
+                
+            elif disease == "kidney":
+                from app.services.kidney_parser import parse_kidney_request  # type: ignore[import]
+                data = parse_kidney_request(raw_text)
+                return _coerce_types(disease, data)
+                
+            elif disease == "diabetes":
+                from app.services.diabetes_parser import parse_diabetes_request  # type: ignore[import]
+                data = parse_diabetes_request(raw_text)
+                return _coerce_types(disease, data)
+                
+            elif disease == "heart":
+                from app.services.heart_parser import parse_heart_request  # type: ignore[import]
+                data = parse_heart_request(raw_text)
+                return _coerce_types(disease, data)
+                
+            elif disease == "liver":
+                from app.services.liver_parser import parse_liver_request  # type: ignore[import]
+                data = parse_liver_request(raw_text)
+                return _coerce_types(disease, data)
+                
+            elif disease == "stroke":
+                from app.services.stroke_parser import parse_stroke_request  # type: ignore[import]
+                data = parse_stroke_request(raw_text)
+                return _coerce_types(disease, data)
+                
+            elif disease == "thyroid":
+                from app.services.thyroid_parser import parse_thyroid_request  # type: ignore[import]
+                data = parse_thyroid_request(raw_text)
+                return _coerce_types(disease, data)
 
-        # For other diseases just return the template defaults
+        except Exception as exc:
+            logger.warning("Legacy parser for %s failed: %s", disease, exc)
+
+        # For unknown diseases or if parsing failed, return the template defaults
         return template
 
 

@@ -49,6 +49,10 @@ async function main() {
       licenseNo: 'MD-2024-001',
       verified: true,
       bio: 'Board-certified internist with 12 years of experience in diagnostic medicine.',
+      availableFrom: '09:00',
+      availableTo: '17:00',
+      maxCaseload: 20,
+      currentCaseload: 0,
     },
   });
 
@@ -70,8 +74,40 @@ async function main() {
       licenseNo: 'MD-2024-002',
       verified: true,
       bio: 'Cardiologist specializing in preventive heart disease management.',
+      availableFrom: '08:00',
+      availableTo: '16:00',
+      maxCaseload: 15,
+      currentCaseload: 0,
     },
   });
+
+  // Additional specialists for auto-assignment
+  const specialistData = [
+    { name: 'Dr. Lisa Wong', email: 'nephrologist@medai.local', specialty: 'Nephrology', license: 'MD-2024-003', bio: 'Nephrologist specializing in chronic kidney disease.' },
+    { name: 'Dr. James Rivera', email: 'endocrinologist@medai.local', specialty: 'Endocrinology', license: 'MD-2024-004', bio: 'Endocrinologist expert in diabetes and thyroid disorders.' },
+    { name: 'Dr. Aisha Patel', email: 'neurologist@medai.local', specialty: 'Neurology', license: 'MD-2024-005', bio: 'Neurologist focused on stroke prevention and treatment.' },
+    { name: 'Dr. Omar Hassan', email: 'hepatologist@medai.local', specialty: 'Hepatology', license: 'MD-2024-006', bio: 'Hepatologist specializing in liver disease management.' },
+    { name: 'Dr. Emily Chen', email: 'psychiatrist@medai.local', specialty: 'Developmental Pediatrics', license: 'MD-2024-007', bio: 'Developmental pediatrician specializing in autism spectrum disorders.' },
+  ];
+
+  for (const spec of specialistData) {
+    const specUser = await prisma.user.create({
+      data: { name: spec.name, email: spec.email, password: doctorPassword, role: 'DOCTOR' },
+    });
+    await prisma.doctorProfile.create({
+      data: {
+        userId: specUser.id,
+        specialty: spec.specialty,
+        licenseNo: spec.license,
+        verified: true,
+        bio: spec.bio,
+        availableFrom: '09:00',
+        availableTo: '17:00',
+        maxCaseload: 15,
+        currentCaseload: 0,
+      },
+    });
+  }
 
   const patient = await prisma.user.create({
     data: {

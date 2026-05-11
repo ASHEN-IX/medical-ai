@@ -47,6 +47,34 @@ class StagedAnalyzeRequest(BaseModel):
 # ---- Phase 1: Upload report -> initial analysis + questions ----
 
 @router.post(
+    "/dynamic-questions/generate",
+    response_model=Dict[str, List[Dict[str, object]]],
+    tags=["dynamic-questions"],
+)
+async def generate_questions_compat(
+    payload: Dict[str, object],
+    request: Request,
+):
+    """Compatibility endpoint for medical-api's DynamicQuestionsService."""
+    request_id = getattr(request.state, "request_id", "req_unknown")
+    disease = str(payload.get("disease", "auto"))
+    risk_level = str(payload.get("riskLevel", "NORMAL"))
+    analysis_data = payload.get("analysisData", {})
+    
+    # We use run_initial_analysis logic
+    result = await staged_service.run_initial_analysis(
+        report_type=disease,
+        features=analysis_data.get("features", {}) if isinstance(analysis_data, dict) else {},
+        raw_text=analysis_data.get("rawText", "") if isinstance(analysis_data, dict) else "",
+        symptoms=analysis_data.get("symptoms", []) if isinstance(analysis_data, dict) else [],
+        include_explanation=True,
+        request_id=request_id,
+    )
+    
+    return {"questions": [q.model_dump() for q in result.questions]}
+
+
+@router.post(
     "/diagnosis/upload",
     response_model=InitialAnalysisResponse,
     responses={

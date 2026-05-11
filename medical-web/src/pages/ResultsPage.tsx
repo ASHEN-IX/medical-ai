@@ -200,7 +200,8 @@ export default function ResultsPage() {
   }, [currentAnalysis?.id, history, openHistoryItem, resultId, setCurrentAnalysis]);
 
   const activeAnalysis = currentAnalysis;
-  const detectedModels = activeAnalysis?.response.selected_models || [];
+  const response = activeAnalysis?.response ?? ({} as any);
+  const detectedModels = response.selected_models || [];
   const autismFocused = isAutismFocused(detectedModels);
   const { autismDetected, autismProbability } = getAutismDecision(activeAnalysis);
 
@@ -210,7 +211,7 @@ export default function ResultsPage() {
     }
 
     if (autismFocused) {
-      return detectedModels.filter((modelName) => AUTISM_MODELS.includes(modelName));
+      return detectedModels.filter((modelName: string) => AUTISM_MODELS.includes(modelName));
     }
 
     return Array.from(new Set([...CORE_MODELS, ...detectedModels]));
@@ -240,7 +241,6 @@ export default function ResultsPage() {
     );
   }
 
-  const { response } = activeAnalysis;
   const progressValue = riskProgressValue(response.final_assessment.overall_risk);
 
   const detectedCondition = autismFocused
@@ -263,7 +263,7 @@ export default function ResultsPage() {
 
   const followUpQuestions = autismFocused ? (autismDetected ? AUTISM_FOLLOW_UP_QUESTIONS : []) : buildFollowUpQuestions(detectedModels, response.final_assessment.overall_risk);
   const filteredRagContext = autismFocused
-    ? response.rag_context.filter((item) => item.toLowerCase().includes("autism_spectrum_disorder"))
+    ? response.rag_context.filter((item: string) => item.toLowerCase().includes("autism_spectrum_disorder"))
     : response.rag_context;
 
   const downloadJSON = () => {
@@ -349,7 +349,7 @@ export default function ResultsPage() {
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Selected Models</p>
             <p className="mt-2 text-sm font-semibold text-slate-900">
               {response.selected_models.length > 0
-                ? response.selected_models.map((modelName) => formatModelName(modelName)).join(", ")
+                ? response.selected_models.map((modelName: string) => formatModelName(modelName)).join(", ")
                 : "None"}
             </p>
           </div>
@@ -382,7 +382,7 @@ export default function ResultsPage() {
       </article>
 
       <div className="grid gap-4 md:grid-cols-3">
-        {orderedModels.map((modelName) => (
+        {orderedModels.map((modelName: string) => (
           <ModelResultCard 
             key={modelName} 
             modelName={modelName} 
@@ -396,7 +396,7 @@ export default function ResultsPage() {
         <h2 className="text-lg font-semibold text-slate-900">AI Reasoning</h2>
         {response.reasoning.length > 0 ? (
           <ul className="mt-3 space-y-2 text-sm text-slate-700">
-            {response.reasoning.map((reason, index) => (
+            {response.reasoning.map((reason: string, index: number) => (
               <li key={`${reason}-${index}`} className="rounded-lg bg-slate-50 px-3 py-2">
                 {reason}
               </li>
@@ -414,7 +414,7 @@ export default function ResultsPage() {
             Retrieved clinical references and background evidence used to support the analysis.
           </p>
           <ul className="mt-3 space-y-2 text-sm text-slate-700">
-            {filteredRagContext.map((item, index) => (
+            {filteredRagContext.map((item: string, index: number) => (
               <li key={`${item}-${index}`} className="rounded-lg bg-slate-50 px-3 py-2">
                 {item}
               </li>
@@ -487,10 +487,10 @@ export default function ResultsPage() {
       <article className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
         <h2 className="text-lg font-semibold text-slate-900">Metadata</h2>
         <div className="mt-3 grid gap-2 text-sm text-slate-700">
-          <p>
+            <p>
             <span className="font-semibold">Selected Models:</span>{" "}
             {response.selected_models.length > 0
-              ? response.selected_models.map((modelName) => formatModelName(modelName)).join(", ")
+              ? response.selected_models.map((modelName: string) => formatModelName(modelName)).join(", ")
               : "None"}
           </p>
           <p>

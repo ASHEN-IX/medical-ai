@@ -27,6 +27,8 @@ from app.api.routes.report_processing import router as report_processing_router
 from app.api.routes.manual_run import router as manual_run_router
 from app.api.routes.chat import router as chat_router
 from app.api.routes.staged_diagnosis import router as staged_diagnosis_router
+from app.api.routes.prevention_plan import router as prevention_plan_router
+from app.api.routes.specialist_assignment import router as specialist_assignment_router
 from app.knowledge_graph.kg_service import KnowledgeGraphServiceError, knowledge_graph_service
 from app.models.schemas import ErrorDetail, ErrorResponse, HealthResponse
 from app.services.medical_rag_service import MedicalRagServiceError, medical_rag_service
@@ -221,6 +223,8 @@ app.include_router(report_processing_router, prefix="/api/v1")
 app.include_router(manual_run_router, prefix="/api/v1")
 app.include_router(chat_router, prefix="/api/v1")
 app.include_router(staged_diagnosis_router, prefix="/api/v1")
+app.include_router(prevention_plan_router, prefix="/api/v1")
+app.include_router(specialist_assignment_router, prefix="/api/v1")
 
 # Initialize Prometheus Instrumentator
 Instrumentator().instrument(app).expose(app)

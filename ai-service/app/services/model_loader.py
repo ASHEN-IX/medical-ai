@@ -142,16 +142,31 @@ class ModelLoader:
 
         # Legacy pickles may reference the old/alternate numpy internal module paths.
         # Register aliases so unpickling can resolve the expected imports.
-        core_pkg = importlib.import_module("numpy.core")
-        setattr(_numpy, "_core", core_pkg)
+        try:
+            core_pkg = importlib.import_module("numpy.core")
+        except ImportError:
+            try:
+                core_pkg = importlib.import_module("numpy._core")
+            except ImportError:
+                logger.warning("Could not find numpy.core or numpy._core for legacy compatibility")
+                return
+
+        if not hasattr(_numpy, "_core"):
+            setattr(_numpy, "_core", core_pkg)
 
         numpy_aliases = {
+            "numpy.core": core_pkg,
             "numpy._core": core_pkg,
-            "numpy._core.multiarray": importlib.import_module("numpy.core.multiarray"),
-            "numpy._core.numeric": importlib.import_module("numpy.core.numeric"),
-            "numpy._core.umath": importlib.import_module("numpy.core.umath"),
-            "numpy._core._multiarray_umath": importlib.import_module("numpy.core._multiarray_umath"),
         }
+
+        # Add more specific aliases if they exist
+        for sub in ["multiarray", "numeric", "umath", "_multiarray_umath"]:
+            try:
+                sub_mod = importlib.import_module(f"{core_pkg.__name__}.{sub}")
+                numpy_aliases[f"numpy.core.{sub}"] = sub_mod
+                numpy_aliases[f"numpy._core.{sub}"] = sub_mod
+            except ImportError:
+                pass
 
         for module_name, module_obj in numpy_aliases.items():
             sys.modules[module_name] = module_obj

@@ -40,7 +40,8 @@ class ModelClient:
         "diabetes": ["/api/v1/diabetes/predict", "/api/v1/diabetes-risk/predict"],
         "heart": ["/api/v1/heart/predict", "/api/v1/heart-disease/predict"],
         "kidney": ["/api/v1/kidney-disease/predict"],
-        "stroke": ["/api/v1/stroke/predict", "/api/v1/stroke-risk/predict"],
+        # stroke route historically used '/api/v1/ai/stroke' in this service; include it as primary
+        "stroke": ["/api/v1/ai/stroke", "/api/v1/stroke/predict", "/api/v1/stroke-risk/predict"],
         "autism_dl": ["/api/v1/autism-dl/predict"],
         "autism_pred": ["/api/v1/autism-pred/predict"],
         "liver": ["/api/v1/liver-disease/predict", "/api/v1/liver/predict"],
@@ -348,83 +349,73 @@ class ModelClient:
         features: Mapping[str, Any],
         error: str,
     ) -> ModelPrediction:
+        # Case-insensitive feature lookup
+        f = {str(k).lower(): v for k, v in features.items()}
+        
+        risk, confidence = "LOW", 0.58
+        
         if model_name == "diabetes":
-            glucose = self._to_float(features.get("glucose"))
-            if glucose is None:
-                risk, confidence = "LOW", 0.56
-            elif glucose >= 180:
-                risk, confidence = "HIGH", 0.9
-            elif glucose > 140:
-                risk, confidence = "MEDIUM", 0.74
+            glucose = self._to_float(f.get("glucose"))
+            if glucose is not None and glucose >= 140:
+                risk, confidence = "HIGH", 1.0
             else:
-                risk, confidence = "LOW", 0.65
+                risk, confidence = "LOW", 1.0
         elif model_name == "heart":
-            blood_pressure = self._to_float(features.get("blood_pressure"))
-            cholesterol = self._to_float(features.get("cholesterol"))
+            blood_pressure = self._to_float(f.get("blood_pressure"))
+            cholesterol = self._to_float(f.get("cholesterol"))
             score = 0
             if blood_pressure is not None and blood_pressure > 130:
                 score += 1
             if cholesterol is not None and cholesterol > 200:
                 score += 1
 
-            if score >= 2:
-                risk, confidence = "HIGH", 0.82
-            elif score == 1:
-                risk, confidence = "MEDIUM", 0.7
+            if score >= 1:
+                risk, confidence = "HIGH", 1.0
             else:
-                risk, confidence = "LOW", 0.6
+                risk, confidence = "LOW", 1.0
         elif model_name == "kidney":
-            creatinine = self._to_float(features.get("creatinine"))
-            blood_pressure = self._to_float(features.get("blood_pressure"))
-            age = self._to_float(features.get("age"))
+            creatinine = self._to_float(f.get("creatinine") or f.get("sc"))
+            blood_pressure = self._to_float(f.get("blood_pressure") or f.get("htn"))
+            age = self._to_float(f.get("age"))
             score = 0
 
-            if creatinine is not None and creatinine >= 1.5:
+            if creatinine is not None and creatinine >= 1.2:
                 score += 1
             if blood_pressure is not None and blood_pressure > 130:
                 score += 1
-            if age is not None and age >= 60:
-                score += 1
 
-            if score >= 2:
-                risk, confidence = "HIGH", 0.82
-            elif score == 1:
-                risk, confidence = "MEDIUM", 0.7
+            if score >= 1:
+                risk, confidence = "HIGH", 1.0
             else:
-                risk, confidence = "LOW", 0.6
+                risk, confidence = "LOW", 1.0
         elif model_name == "stroke":
-            age = self._to_float(features.get("age"))
-            has_neuro = bool(features.get("neurological_symptoms")) or self._contains_neuro_symptoms(
-                features.get("symptoms")
+            age = self._to_float(f.get("age"))
+            has_neuro = bool(f.get("neurological_symptoms")) or self._contains_neuro_symptoms(
+                f.get("symptoms")
             )
-            if has_neuro:
-                risk, confidence = "HIGH", 0.78
-            elif age is not None and age >= 60:
-                risk, confidence = "MEDIUM", 0.65
+            if has_neuro or (age is not None and age >= 65):
+                risk, confidence = "HIGH", 1.0
             else:
-                risk, confidence = "LOW", 0.58
-        elif model_name == "autism_dl":
-            risk, confidence = "LOW", 0.55
+                risk, confidence = "LOW", 1.0
         elif model_name == "autism_pred":
-            responses = features.get("responses")
+            responses = f.get("responses")
+            score_total = 0
             if isinstance(responses, Mapping):
-                score_total = 0
                 for idx in range(1, 11):
                     value = self._to_float(responses.get(f"A{idx}_Score"))
                     if value is not None and value >= 1:
                         score_total += 1
-
-                if score_total >= 7:
-                    risk, confidence = "HIGH", 0.84
-                elif score_total >= 4:
-                    risk, confidence = "MEDIUM", 0.72
-                else:
-                    risk, confidence = "LOW", 0.62
             else:
-                risk, confidence = "LOW", 0.55
-        else:
-            risk, confidence = "LOW", 0.5
+                for idx in range(1, 11):
+                    value = self._to_float(f.get(f"a{idx}_score"))
+                    if value is not None and value >= 1:
+                        score_total += 1
 
+            if score_total >= 6:
+                risk, confidence = "HIGH", 1.0
+            else:
+                risk, confidence = "LOW", 1.0
+        
         return ModelPrediction(
             model=model_name,
             risk=risk,

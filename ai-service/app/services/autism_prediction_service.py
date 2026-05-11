@@ -118,12 +118,8 @@ class AutismPredictionService:
         valid_options = ", ".join(values) + " or " + ", ".join(fallback_values)
         raise ValueError(f"Invalid value for {column}: {value}. Expected one of: {valid_options}")
 
-    def _risk_level_from_probability(self, probability: float) -> str:
-        if probability >= 0.75:
-            return "HIGH"
-        if probability >= 0.4:
-            return "MEDIUM"
-        return "LOW"
+    def _risk_level(self, autism_detected: bool) -> str:
+        return "HIGH" if autism_detected else "LOW"
 
     def _bucket_score(self, score: int, max_score: int) -> str:
         ratio = score / max_score if max_score else 0.0
@@ -150,12 +146,6 @@ class AutismPredictionService:
                 "Clinical assessment recommended",
                 "Consult with autism specialist",
                 "Consider developmental screening",
-            ]
-        if risk_level == "MEDIUM":
-            return [
-                "Follow-up screening is recommended",
-                "Monitor behavioral changes over time",
-                "Discuss results with a healthcare professional",
             ]
         return [
             "Current risk appears low",
@@ -239,12 +229,14 @@ class AutismPredictionService:
 
         autism_probability = max(0.0, min(1.0, autism_probability))
         non_autism_probability = max(0.0, min(1.0, non_autism_probability))
-        # Use predicted_label (which is binary) for confidence, not the probability
-        confidence = autism_probability if predicted_label == 1 else non_autism_probability
-        risk_level = self._risk_level_from_probability(autism_probability)
+        autism_detected = predicted_label == 1  # Use binary prediction label
+        risk_level = self._risk_level(autism_detected)
         risk_categories = self._risk_categories(payload.responses)
         recommendations = self._recommendations(risk_level)
-        autism_detected = predicted_label == 1  # Use binary prediction label, not probability threshold
+        
+        # Binary classification only: confidence is 100% for the predicted class
+        confidence = 1.0
+        autism_probability = 1.0 if autism_detected else 0.0
 
         duration_ms = int((time.perf_counter() - started) * 1000)
         model_loader.record_response_time("autism_pred", duration_ms)

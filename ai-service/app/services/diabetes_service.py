@@ -22,12 +22,8 @@ logger = logging.getLogger(__name__)
 
 
 class DiabetesService:
-    def _risk_level(self, probability: float) -> str:
-        if probability >= 0.75:
-            return "HIGH"
-        if probability >= 0.4:
-            return "MEDIUM"
-        return "LOW"
+    def _risk_level(self, diabetic: bool) -> str:
+        return "HIGH" if diabetic else "LOW"
 
     def _recommendations(self, risk_level: str) -> list[str]:
         if risk_level == "HIGH":
@@ -35,12 +31,6 @@ class DiabetesService:
                 "Clinical diabetes evaluation is strongly recommended",
                 "Confirm with fasting plasma glucose or HbA1c testing",
                 "Review lifestyle, medication, and metabolic risk factors",
-            ]
-        if risk_level == "MEDIUM":
-            return [
-                "Follow-up screening is recommended",
-                "Monitor glucose trends and BMI-related risk factors",
-                "Discuss preventive care with a healthcare professional",
             ]
         return [
             "Current model risk appears low",
@@ -61,43 +51,14 @@ class DiabetesService:
         }
 
         expected_columns = model_loader.diabetes_feature_columns or DIABETES_FEATURE_COLUMNS
-        normalized = {column: row.get(column, 0) for column in expected_columns}
+        # Case-insensitive mapping from our row to the model's expected columns
+        row_lower = {k.lower(): v for k, v in row.items()}
+        normalized = {column: row_lower.get(column.lower(), 0) for column in expected_columns}
         return pd.DataFrame([normalized], columns=expected_columns)
 
     def _is_diabetes_label(self, label: Any) -> bool:
         text = str(label).strip().lower()
         return text in {"1", "diabetic", "diabetes", "yes", "positive", "true"}
-
-    def _probabilities(self, model: Any, feature_frame: pd.DataFrame, diabetic: bool) -> tuple[float, float]:
-        if hasattr(model, "predict_proba"):
-            probs = np.asarray(model.predict_proba(feature_frame)[0], dtype=np.float32)
-            if probs.ndim == 1 and probs.size >= 2:
-                classes = getattr(model, "classes_", None)
-                if classes is not None and len(classes) == probs.size:
-                    class_map = {str(classes[idx]).strip().lower(): float(probs[idx]) for idx in range(probs.size)}
-                    diabetes_prob = (
-                        class_map.get("1")
-                        or class_map.get("diabetic")
-                        or class_map.get("diabetes")
-                        or class_map.get("yes")
-                        or class_map.get("positive")
-                    )
-                    # If still None, use index-based lookup for class 1 probability
-                    if diabetes_prob is None:
-                        # Always use probs[1] when diabetic (binary prediction=1)
-                        diabetes_prob = float(probs[1]) if diabetic else float(probs[0])
-                else:
-                    diabetes_prob = float(probs[1])
-            elif probs.ndim == 1 and probs.size == 1:
-                diabetes_prob = float(probs[0]) if diabetic else 1.0 - float(probs[0])
-            else:
-                diabetes_prob = 1.0 if diabetic else 0.0
-        else:
-            diabetes_prob = 1.0 if diabetic else 0.0
-
-        diabetes_prob = max(0.0, min(1.0, float(diabetes_prob)))
-        non_diabetes_prob = 1.0 - diabetes_prob
-        return diabetes_prob, non_diabetes_prob
 
     def predict(self, payload: DiabetesRequest, request_id: str) -> DiabetesResponse:
         started = time.perf_counter()
@@ -110,16 +71,19 @@ class DiabetesService:
 
         try:
             prediction_raw = model.predict(feature_frame)[0]
-            # Ensure binary classification - round to nearest 0 or 1
+            # Ensure binary classification
             binary_prediction = int(round(float(prediction_raw)))
-        except Exception as exc:  # pragma: no cover - runtime dependency behavior
+        except Exception as exc:  # pragma: no cover
             logger.exception("Diabetes model inference failed")
             raise RuntimeError("Model inference failed") from exc
 
         diabetic = self._is_diabetes_label(binary_prediction)
-        diabetes_prob, non_diabetes_prob = self._probabilities(model, feature_frame, diabetic)
-        confidence = diabetes_prob if diabetic else non_diabetes_prob
-        risk_level = self._risk_level(diabetes_prob)
+        
+        # Binary classification only
+        diabetes_prob = 1.0 if diabetic else 0.0
+        non_diabetes_prob = 1.0 if not diabetic else 0.0
+        confidence = 1.0
+        risk_level = self._risk_level(diabetic)
 
         duration_ms = int((time.perf_counter() - started) * 1000)
         model_loader.record_response_time("diabetes_pred", duration_ms)
@@ -129,11 +93,11 @@ class DiabetesService:
             prediction=DiabetesPredictionResult(
                 diabetic=diabetic,
                 risk_level=risk_level,
-                confidence_score=round(confidence, 4),
-                diabetes_probability=round(diabetes_prob, 4),
+                confidence_score=confidence,
+                diabetes_probability=diabetes_prob,
                 class_probabilities=DiabetesClassProbabilities(
-                    diabetic=round(diabetes_prob, 4),
-                    non_diabetic=round(non_diabetes_prob, 4),
+                    diabetic=diabetes_prob,
+                    non_diabetic=non_diabetes_prob,
                 ),
             ),
             recommendations=self._recommendations(risk_level),

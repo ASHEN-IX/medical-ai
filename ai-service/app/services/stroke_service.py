@@ -23,12 +23,8 @@ logger = logging.getLogger(__name__)
 
 class StrokeService:
 
-    def _risk_level(self, probability: float) -> str:
-        if probability >= 0.7:
-            return "HIGH"
-        if probability >= 0.4:
-            return "MEDIUM"
-        return "LOW"
+    def _risk_level(self, stroke_detected: bool) -> str:
+        return "HIGH" if stroke_detected else "LOW"
 
     def _recommendations(self, risk_level: str) -> list[str]:
         if risk_level == "HIGH":
@@ -37,13 +33,6 @@ class StrokeService:
                 "Assess cardiovascular and metabolic risk factors",
                 "Consider preventive medication/therapy",
                 "Monitor blood pressure and glucose levels regularly",
-            ]
-        if risk_level == "MEDIUM":
-            return [
-                "Clinical follow-up recommended",
-                "Lifestyle modifications and risk factor management",
-                "Regular monitoring of vital signs",
-                "Reassess in 3-6 months",
             ]
         return [
             "Current stroke risk appears low",
@@ -81,22 +70,6 @@ class StrokeService:
 
         return numeric_frame, model_frame
 
-    def _probabilities(
-        self, model: Any, scaled_input: Any, predicted_is_stroke: bool
-    ) -> tuple[float, float]:
-        if hasattr(model, "predict_proba"):
-            probs = np.asarray(model.predict_proba(scaled_input)[0], dtype=np.float32)
-            if probs.ndim == 1 and probs.size >= 2:
-                stroke_prob = float(probs[1])
-            else:
-                stroke_prob = 1.0 if predicted_is_stroke else 0.0
-        else:
-            stroke_prob = 1.0 if predicted_is_stroke else 0.0
-
-        stroke_prob = max(0.0, min(1.0, float(stroke_prob)))
-        non_stroke_prob = 1.0 - stroke_prob
-        return stroke_prob, non_stroke_prob
-
     def predict(
         self, payload: StrokeRequest, request_id: str
     ) -> StrokeResponse:
@@ -120,12 +93,13 @@ class StrokeService:
             logger.exception("Stroke model inference failed")
             raise RuntimeError("Model inference failed") from exc
 
-        stroke_detected = bool(prediction_raw == 1)
-        stroke_prob, non_stroke_prob = self._probabilities(
-            model, model_frame, stroke_detected
-        )
-        confidence = stroke_prob if stroke_detected else non_stroke_prob
-        risk_level = self._risk_level(stroke_prob)
+        stroke_detected = bool(int(round(float(prediction_raw))) == 1)
+        
+        # Binary classification only
+        stroke_prob = 1.0 if stroke_detected else 0.0
+        non_stroke_prob = 1.0 if not stroke_detected else 0.0
+        confidence = 1.0
+        risk_level = self._risk_level(stroke_detected)
 
         duration_ms = int((time.perf_counter() - started) * 1000)
         model_loader.record_response_time("stroke_pred", duration_ms)
@@ -135,11 +109,11 @@ class StrokeService:
             prediction=StrokePredictionResult(
                 stroke_detected=stroke_detected,
                 risk_level=risk_level,
-                confidence_score=round(confidence, 4),
-                stroke_probability=round(stroke_prob, 4),
+                confidence_score=confidence,
+                stroke_probability=stroke_prob,
                 class_probabilities=StrokeClassProbabilities(
-                    stroke=round(stroke_prob, 4),
-                    non_stroke=round(non_stroke_prob, 4),
+                    stroke=stroke_prob,
+                    non_stroke=non_stroke_prob,
                 ),
             ),
             recommendations=self._recommendations(risk_level),

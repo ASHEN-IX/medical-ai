@@ -10,6 +10,7 @@ import {
   type DoctorReview,
   type AnalysisHistoryItem,
 } from "@/services/api";
+import BiomarkerTrends from "@/components/analytics/BiomarkerTrends";
 
 const RISK_STYLES: Record<string, { bg: string; text: string; ring: string; dot: string }> = {
   LOW: { bg: "bg-emerald-500/15", text: "text-emerald-400", ring: "ring-emerald-500/30", dot: "bg-emerald-400" },
@@ -130,7 +131,7 @@ export default function ResultsPage() {
   const [requestSuccess, setRequestSuccess] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
 
-  const analysisId = searchParams.get("id");
+  const analysisId = searchParams?.get("id") ?? null;
 
   useEffect(() => {
     if (analysisId && (!currentAnalysis || currentAnalysis.id !== analysisId)) {
@@ -170,6 +171,7 @@ export default function ResultsPage() {
   }, [analysis?.id, requestSpecialty, requestUrgency, requestNotes]);
 
   const llm = analysis?.response?.llm_explanation ?? null;
+  const response = analysis?.response ?? ({} as any);
 
   const modelEntries = useMemo(
     () => Object.entries(analysis?.results ?? {}),
@@ -247,6 +249,8 @@ export default function ResultsPage() {
           </p>
         </Card>
       )}
+      {/* Biomarker Trends */}
+      <BiomarkerTrends />
 
       {/* Model Results Grid */}
       {modelEntries.length > 0 && (

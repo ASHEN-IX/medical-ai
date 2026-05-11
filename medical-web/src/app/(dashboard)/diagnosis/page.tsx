@@ -89,6 +89,7 @@ export default function StagedDiagnosisPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [initialResult, setInitialResult] = useState<StagedAnalyzeResponse | null>(null);
+  const [followUpQuestions, setFollowUpQuestions] = useState<FollowUpQuestion[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [answersResult, setAnswersResult] = useState<SubmitAnswersResponse | null>(null);
   const [finalReport, setFinalReport] = useState<FinalReportResponse | null>(null);
@@ -118,6 +119,7 @@ export default function StagedDiagnosisPage() {
       setInitialResult(result);
 
       if (result.needs_follow_up && result.follow_up_questions.length > 0) {
+        setFollowUpQuestions(result.follow_up_questions);
         const initialAnswers: Record<string, string> = {};
         result.follow_up_questions.forEach((q) => { initialAnswers[q.id] = ""; });
         setAnswers(initialAnswers);
@@ -151,6 +153,15 @@ export default function StagedDiagnosisPage() {
       const result = await submitFollowUpAnswers(initialResult.session_id, patientAnswers);
       setAnswersResult(result);
 
+      if (result.needs_more_questions && result.next_questions.length > 0) {
+        setFollowUpQuestions(result.next_questions);
+        const nextAnswers: Record<string, string> = {};
+        result.next_questions.forEach((q) => { nextAnswers[q.id] = ""; });
+        setAnswers(nextAnswers);
+        setStep("questions");
+        return;
+      }
+
       setStep("generating");
       const report = await generateFinalReport(initialResult.session_id);
       setFinalReport(report);
@@ -167,6 +178,7 @@ export default function StagedDiagnosisPage() {
     setImageBase64(null);
     setError(null);
     setInitialResult(null);
+    setFollowUpQuestions([]);
     setAnswers({});
     setAnswersResult(null);
     setFinalReport(null);
@@ -288,7 +300,7 @@ export default function StagedDiagnosisPage() {
               </p>
 
               <div className="mt-6 space-y-6">
-                {initialResult.follow_up_questions.map((q, i) => (
+                {followUpQuestions.map((q, i) => (
                   <div key={q.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-5 transition-all hover:border-white/20">
                     <div className="flex items-start gap-3">
                       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-cyan-500/10 text-xs font-bold text-cyan-400">

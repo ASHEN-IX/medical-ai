@@ -1,25 +1,28 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
-import { fetchInbox, fetchConversation, sendMessage } from "@/services/api";
+import { fetchConversations, fetchConversationMessages, markConversationRead, sendMessage } from "@/services/api";
+import { useSocket } from "@/context/SocketContext";
 
-type InboxEntry = {
-  senderId: string;
-  senderName: string;
-  senderRole: string;
+type ConversationEntry = {
+  id: string;
+  title?: string | null;
+  type: string;
   unreadCount: number;
-  lastMessage: { id: string; content: string; createdAt: string; read: boolean };
+  lastMessage: { id: string; content: string; createdAt: string; read: boolean } | null;
+  otherParticipant: { id: string; name: string; role: string } | null;
 };
 
 type Message = {
   id: string;
   senderId: string;
-  receiverId: string;
   content: string;
   read: boolean;
   createdAt: string;
   sender: { id: string; name: string; role: string };
+  conversationId: string;
 };
 
 function roleBadgeClasses(role: string): string {
@@ -58,62 +61,83 @@ function formatTimestamp(iso: string): string {
 
 export default function MessagesPage() {
   const { user } = useAuth();
-  const [inbox, setInbox] = useState<InboxEntry[]>([]);
-  const [activeContactId, setActiveContactId] = useState<string | null>(null);
+  const { socket, connected } = useSocket();
+  const searchParams = useSearchParams();
+  const pendingContactId = searchParams?.get("contact");
+  const [conversations, setConversations] = useState<ConversationEntry[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
-  const [loadingInbox, setLoadingInbox] = useState(true);
-  const [loadingConvo, setLoadingConvo] = useState(false);
+  const [loadingConversations, setLoadingConversations] = useState(true);
+  const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const activeContact = inbox.find((e) => e.senderId === activeContactId) ?? null;
+  const activeConversation = useMemo(
+    () => conversations.find((conversation) => conversation.id === activeConversationId) ?? null,
+    [conversations, activeConversationId]
+  );
 
-  const loadInbox = useCallback(async () => {
+  const activeContact = activeConversation?.otherParticipant ?? null;
+
+  const loadConversations = useCallback(async () => {
+    setLoadingConversations(true);
     try {
-      const data = (await fetchInbox()) as InboxEntry[];
-      setInbox(data);
+      const data = (await fetchConversations()) as ConversationEntry[];
+      setConversations(data);
+
+      if (pendingContactId) {
+        const matchingConversation = data.find((conversation) => conversation.otherParticipant?.id === pendingContactId);
+        if (matchingConversation) {
+          setActiveConversationId(matchingConversation.id);
+        }
+      }
     } catch {
       /* silent */
     } finally {
-      setLoadingInbox(false);
+      setLoadingConversations(false);
     }
-  }, []);
+  }, [pendingContactId]);
 
-  const loadConversation = useCallback(async (contactId: string) => {
-    setLoadingConvo(true);
+  const loadConversation = useCallback(async (conversationId: string) => {
+    setLoadingMessages(true);
     try {
-      const data = (await fetchConversation(contactId)) as Message[];
+      const data = (await fetchConversationMessages(conversationId)) as Message[];
       setMessages(data);
+      void markConversationRead(conversationId);
     } catch {
       setMessages([]);
     } finally {
-      setLoadingConvo(false);
+      setLoadingMessages(false);
     }
   }, []);
 
   useEffect(() => {
-    void loadInbox();
-  }, [loadInbox]);
+    void loadConversations();
+  }, [loadConversations]);
 
   useEffect(() => {
-    if (!activeContactId) {
+    if (!activeConversationId) {
       setMessages([]);
       return;
     }
-    void loadConversation(activeContactId);
+    void loadConversation(activeConversationId);
+  }, [activeConversationId, loadConversation]);
 
-    if (pollRef.current) clearInterval(pollRef.current);
-    pollRef.current = setInterval(() => {
-      void loadConversation(activeContactId);
-      void loadInbox();
-    }, 10_000);
+  useEffect(() => {
+    if (!socket) return;
+
+    socket.on("newMessage", (msg: Message) => {
+      if (msg.conversationId === activeConversationId) {
+        setMessages((prev) => [...prev, msg]);
+      }
+      void loadConversations();
+    });
 
     return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
+      socket.off("newMessage");
     };
-  }, [activeContactId, loadConversation, loadInbox]);
+  }, [socket, activeConversationId, loadConversations]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -121,14 +145,44 @@ export default function MessagesPage() {
 
   const handleSend = async () => {
     const trimmed = draft.trim();
-    if (!trimmed || !activeContactId || sending) return;
+    if (!trimmed || sending) return;
 
     setSending(true);
     try {
-      await sendMessage({ receiverId: activeContactId, content: trimmed });
+      const receiverId = activeContact?.id ?? pendingContactId ?? null;
+
+      if (socket && receiverId) {
+        const tempMessage: Message = {
+          id: `temp-${Date.now()}`,
+          senderId: user?.id || "",
+          content: trimmed,
+          read: false,
+          createdAt: new Date().toISOString(),
+          sender: {
+            id: user?.id || "",
+            name: user?.name || "You",
+            role: user?.role || "PATIENT",
+          },
+          conversationId: activeConversationId || `pending-${receiverId}`,
+        };
+
+        setMessages((prev) => [...prev, tempMessage]);
+        socket.emit("sendMessage", {
+          conversationId: activeConversationId ?? undefined,
+          receiverId,
+          content: trimmed,
+        });
+      } else {
+        const msg = await sendMessage({
+          conversationId: activeConversationId ?? undefined,
+          receiverId: receiverId ?? undefined,
+          content: trimmed,
+        });
+        setMessages((prev) => [...prev, msg]);
+      }
+
       setDraft("");
-      await loadConversation(activeContactId);
-      await loadInbox();
+      await loadConversations();
     } catch {
       /* silent */
     } finally {
@@ -143,8 +197,8 @@ export default function MessagesPage() {
     }
   };
 
-  const selectContact = (id: string) => {
-    setActiveContactId(id);
+  const selectConversation = (conversation: ConversationEntry) => {
+    setActiveConversationId(conversation.id);
     setDraft("");
   };
 
@@ -155,25 +209,28 @@ export default function MessagesPage() {
         <div className="border-b border-white/10 px-6 py-5">
           <h2 className="text-xl font-semibold text-white">Messages</h2>
           <p className="mt-1 text-sm text-white/50">
-            {loadingInbox ? "Loading..." : `${inbox.length} conversation${inbox.length === 1 ? "" : "s"}`}
+            {loadingConversations ? "Loading..." : `${conversations.length} conversation${conversations.length === 1 ? "" : "s"}`}
+          </p>
+          <p className="mt-2 text-[11px] uppercase tracking-[0.2em] text-white/35">
+            {connected ? "Realtime connected" : "Realtime offline"}
           </p>
         </div>
 
         <div className="flex-1 overflow-y-auto p-3">
-          {!loadingInbox && inbox.length === 0 && (
+          {!loadingConversations && conversations.length === 0 && (
             <div className="flex h-full items-center justify-center px-4">
               <p className="text-center text-sm text-white/40">No conversations yet</p>
             </div>
           )}
 
           <div className="space-y-1.5">
-            {inbox.map((entry) => {
-              const isActive = entry.senderId === activeContactId;
+            {conversations.map((entry) => {
+              const isActive = entry.id === activeConversationId;
               return (
                 <button
-                  key={entry.senderId}
+                  key={entry.id}
                   type="button"
-                  onClick={() => selectContact(entry.senderId)}
+                  onClick={() => selectConversation(entry)}
                   className={`w-full rounded-2xl border px-4 py-3.5 text-left transition-all duration-200 ${
                     isActive
                       ? "border-cyan-400/30 bg-cyan-500/10 shadow-lg shadow-cyan-500/5"
@@ -183,22 +240,26 @@ export default function MessagesPage() {
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="truncate font-medium text-white">{entry.senderName}</span>
+                        <span className="truncate font-medium text-white">
+                          {entry.otherParticipant?.name || entry.title || "Conversation"}
+                        </span>
                         <span
-                          className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider ${roleBadgeClasses(entry.senderRole)}`}
+                          className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider ${roleBadgeClasses(entry.otherParticipant?.role || "PATIENT")}`}
                         >
-                          {entry.senderRole}
+                          {entry.otherParticipant?.role || "PATIENT"}
                         </span>
                       </div>
                       <p className="mt-1 truncate text-sm text-white/50">
-                        {entry.lastMessage.content}
+                        {entry.lastMessage?.content || "No messages yet"}
                       </p>
                     </div>
 
                     <div className="flex shrink-0 flex-col items-end gap-1.5">
-                      <span className="text-[11px] text-white/40">
-                        {formatTime(entry.lastMessage.createdAt)}
-                      </span>
+                      {entry.lastMessage && (
+                        <span className="text-[11px] text-white/40">
+                          {formatTime(entry.lastMessage.createdAt)}
+                        </span>
+                      )}
                       {entry.unreadCount > 0 && (
                         <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-cyan-500 px-1.5 text-[10px] font-bold text-white">
                           {entry.unreadCount > 99 ? "99+" : entry.unreadCount}
@@ -215,7 +276,7 @@ export default function MessagesPage() {
 
       {/* ---- Right main area: Conversation ---- */}
       <section className="flex min-w-0 flex-1 flex-col rounded-3xl border border-white/10 bg-white/5 shadow-2xl backdrop-blur-xl">
-        {!activeContactId ? (
+        {!activeConversationId && !pendingContactId ? (
           <div className="flex flex-1 items-center justify-center">
             <div className="text-center">
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
@@ -232,21 +293,21 @@ export default function MessagesPage() {
             {/* Conversation header */}
             <div className="flex items-center gap-3 border-b border-white/10 px-6 py-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/10 text-sm font-semibold text-white">
-                {(activeContact?.senderName ?? "?")[0].toUpperCase()}
+                {(activeContact?.name ?? "C")[0].toUpperCase()}
               </div>
               <div>
-                <p className="font-semibold text-white">{activeContact?.senderName ?? "Unknown"}</p>
+                <p className="font-semibold text-white">{activeContact?.name ?? "New conversation"}</p>
                 <span
-                  className={`inline-block rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider ${roleBadgeClasses(activeContact?.senderRole ?? "")}`}
+                  className={`inline-block rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider ${roleBadgeClasses(activeContact?.role ?? "PATIENT")}`}
                 >
-                  {activeContact?.senderRole ?? ""}
+                  {activeContact?.role ?? "PATIENT"}
                 </span>
               </div>
             </div>
 
             {/* Messages */}
             <div className="flex-1 overflow-y-auto px-6 py-4">
-              {loadingConvo && messages.length === 0 && (
+              {loadingMessages && messages.length === 0 && (
                 <div className="flex h-full items-center justify-center">
                   <div className="flex items-center gap-3">
                     <div className="h-4 w-4 animate-spin rounded-full border-2 border-cyan-400 border-t-transparent" />
@@ -295,7 +356,7 @@ export default function MessagesPage() {
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Type your message..."
+                  placeholder={pendingContactId && !activeConversationId ? "Start your new conversation..." : "Type your message..."}
                   rows={1}
                   className="flex-1 resize-none rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-white/30 outline-none transition focus:border-cyan-400/40 focus:ring-1 focus:ring-cyan-400/20"
                 />

@@ -103,7 +103,7 @@ export interface AnalysisHistoryItem {
   aiInsights: string | null;
   status: string;
   selectedModels: string[];
-  features: Record<string, number>;
+  features: Record<string, number | string | null | undefined>;
   symptoms: string[];
   results: Record<string, GatewayModelResult>;
   doctorReviews?: DoctorReview[];
@@ -285,6 +285,8 @@ export interface SubmitAnswersResponse {
   stage: SessionStage;
   enriched_features: Record<string, unknown>;
   feature_count: number;
+  next_questions: FollowUpQuestion[];
+  needs_more_questions: boolean;
 }
 
 export interface FinalReportResponse {
@@ -459,18 +461,24 @@ export async function fetchFeedbackStats() {
 }
 
 // Messages
-export async function sendMessage(body: { receiverId: string; content: string }) {
+export async function sendMessage(body: {
+  conversationId?: string;
+  receiverId?: string;
+  content: string;
+  type?: string;
+  fileUrl?: string;
+}) {
   const { data } = await apiClient.post("/messages", body);
   return data;
 }
 
-export async function fetchInbox() {
-  const { data } = await apiClient.get("/messages/inbox");
+export async function fetchConversations() {
+  const { data } = await apiClient.get("/messages/conversations");
   return data;
 }
 
-export async function fetchConversation(userId: string) {
-  const { data } = await apiClient.get(`/messages/conversation/${userId}`);
+export async function fetchConversationMessages(conversationId: string) {
+  const { data } = await apiClient.get(`/messages/conversation/${conversationId}/messages`);
   return data;
 }
 
@@ -481,6 +489,11 @@ export async function fetchUnreadCount(): Promise<number> {
   } catch {
     return 0;
   }
+}
+
+export async function markConversationRead(conversationId: string) {
+  const { data } = await apiClient.patch(`/messages/conversation/${conversationId}/read`);
+  return data;
 }
 
 // AI Chat
@@ -527,4 +540,220 @@ export async function saveAnalysisToHistory(
     request,
     response,
   };
+}
+
+// ============================================================
+// NEW API FUNCTIONS — Healthcare Ecosystem Extension
+// ============================================================
+
+// --- Manual Tests ---
+export async function fetchManualTestSchemas() {
+  const { data } = await apiClient.get("/manual-tests/schemas");
+  return data;
+}
+
+export async function fetchManualTestSchema(disease: string) {
+  const { data } = await apiClient.get(`/manual-tests/schemas/${disease}`);
+  return data;
+}
+
+export async function runManualTest(disease: string, inputData: Record<string, any>) {
+  const { data } = await apiClient.post("/manual-tests/run", { disease, inputData });
+  return data;
+}
+
+export async function fetchMyManualTests() {
+  const { data } = await apiClient.get("/manual-tests/my-tests");
+  return data;
+}
+
+// --- Case Assignments ---
+export async function autoAssignSpecialist(body: {
+  analysisId: string;
+  disease: string;
+  priority?: string;
+  notes?: string;
+}) {
+  const { data } = await apiClient.post("/case-assignments/auto-assign", body);
+  return data;
+}
+
+export async function fetchMyCases() {
+  const { data } = await apiClient.get("/case-assignments/my-cases");
+  return data;
+}
+
+export async function fetchCaseById(id: string) {
+  const { data } = await apiClient.get(`/case-assignments/${id}`);
+  return data;
+}
+
+// --- Appointments ---
+export async function createAppointment(body: {
+  doctorId: string;
+  caseAssignmentId?: string;
+  scheduledAt: string;
+  durationMinutes?: number;
+  type?: string;
+  notes?: string;
+}) {
+  const { data } = await apiClient.post("/appointments", body);
+  return data;
+}
+
+export async function fetchMyAppointments() {
+  const { data } = await apiClient.get("/appointments/my-appointments");
+  return data;
+}
+
+export async function cancelAppointment(id: string) {
+  const { data } = await apiClient.patch(`/appointments/${id}/cancel`);
+  return data;
+}
+
+export async function createTeleconsultation(appointmentId: string) {
+  const { data } = await apiClient.post(`/appointments/${appointmentId}/teleconsultation`);
+  return data;
+}
+
+export async function fetchTeleconsultation(roomId: string) {
+  const { data } = await apiClient.get(`/appointments/teleconsultation/${roomId}`);
+  return data;
+}
+
+// --- Alerts ---
+export async function fetchAlerts(unreadOnly = false) {
+  const { data } = await apiClient.get(`/alerts?unreadOnly=${unreadOnly}`);
+  return data;
+}
+
+export async function fetchAlertUnreadCount(): Promise<number> {
+  try {
+    const { data } = await apiClient.get<{ unreadCount: number }>("/alerts/unread-count");
+    return data.unreadCount;
+  } catch {
+    return 0;
+  }
+}
+
+export async function markAlertRead(id: string) {
+  const { data } = await apiClient.patch(`/alerts/${id}/read`);
+  return data;
+}
+
+export async function dismissAlert(id: string) {
+  const { data } = await apiClient.patch(`/alerts/${id}/dismiss`);
+  return data;
+}
+
+export async function markAllAlertsRead() {
+  const { data } = await apiClient.patch("/alerts/read-all");
+  return data;
+}
+
+// --- Transportation ---
+export async function bookTransportation(body: {
+  appointmentId?: string;
+  vehicleType?: string;
+  pickupAddress: string;
+  pickupLat?: number;
+  pickupLng?: number;
+  destAddress: string;
+  destLat?: number;
+  destLng?: number;
+  scheduledAt: string;
+  notes?: string;
+}) {
+  const { data } = await apiClient.post("/transportation/book", body);
+  return data;
+}
+
+export async function fetchMyTransportBookings() {
+  const { data } = await apiClient.get("/transportation/my-bookings");
+  return data;
+}
+
+export async function cancelTransportBooking(id: string) {
+  const { data } = await apiClient.patch(`/transportation/${id}/cancel`);
+  return data;
+}
+
+// --- Prescriptions & Medications ---
+export async function fetchMyPrescriptions() {
+  const { data } = await apiClient.get("/prescriptions/my-prescriptions");
+  return data;
+}
+
+export async function createPrescription(body: {
+  patientId: string;
+  caseAssignmentId?: string;
+  diagnosis?: string;
+  notes?: string;
+  medications: Array<{
+    name: string; dosage: string; frequency: string;
+    route?: string; startDate: string; endDate?: string;
+    sideEffects?: string[]; instructions?: string;
+  }>;
+}) {
+  const { data } = await apiClient.post("/prescriptions", body);
+  return data;
+}
+
+export async function fetchUpcomingReminders() {
+  const { data } = await apiClient.get("/prescriptions/reminders");
+  return data;
+}
+
+export async function markReminderTaken(id: string) {
+  const { data } = await apiClient.patch(`/prescriptions/reminders/${id}/taken`);
+  return data;
+}
+
+export async function markReminderSkipped(id: string, notes?: string) {
+  const { data } = await apiClient.patch(`/prescriptions/reminders/${id}/skipped`, { notes });
+  return data;
+}
+
+// --- Prevention Plans ---
+export async function generatePreventionPlan() {
+  const { data } = await apiClient.post("/prevention-plans/generate");
+  return data;
+}
+
+export async function fetchActivePreventionPlan() {
+  const { data } = await apiClient.get("/prevention-plans/active");
+  return data;
+}
+
+export async function fetchAllPreventionPlans() {
+  const { data } = await apiClient.get("/prevention-plans");
+  return data;
+}
+
+// --- Consultation History ---
+export async function fetchConsultationTimeline() {
+  const { data } = await apiClient.get("/consultation-history/timeline");
+  return data;
+}
+
+
+// --- Staged Diagnosis ---
+export async function startStagedDiagnosis(body: { reportId?: string; disease?: string; features?: any; symptoms?: string[] }) {
+  const { data } = await apiClient.post("/staged-diagnosis/start", body);
+  return data;
+}
+
+export async function fetchStagedDiagnosis(id: string) {
+  const { data } = await apiClient.get(`/staged-diagnosis/${id}`);
+  return data;
+}
+
+export async function submitStagedAnswers(id: string, answers: any[]) {
+  const { data } = await apiClient.post(`/staged-diagnosis/${id}/answers`, { answers });
+  return data;
+}
+
+export async function finalizeStagedDiagnosis(id: string) {
+  const { data } = await apiClient.post(`/staged-diagnosis/${id}/finalize`);
+  return data;
 }

@@ -76,6 +76,7 @@ export function AIAnalysisProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       const message = err instanceof Error ? err.message : "AI analysis failed.";
       setError(message);
+      setCurrentAnalysis(null);
       throw err;
     } finally {
       setLoading(false);

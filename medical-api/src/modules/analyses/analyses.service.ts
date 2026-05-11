@@ -6,6 +6,9 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UserRole } from '@prisma/client';
+import { CaseAssignmentsService } from '../case-assignments/case-assignments.service';
+import { AlertsService } from '../alerts/alerts.service';
+import { FamilyConsentService } from '../family-consent/family-consent.service';
 
 export interface AnalysisResult {
   id: string;
@@ -38,7 +41,12 @@ export interface AnalysisResult {
 export class AnalysesService {
   private readonly logger = new Logger(AnalysesService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly caseAssignments: CaseAssignmentsService,
+    private readonly alerts: AlertsService,
+    private readonly familyConsent: FamilyConsentService,
+  ) {}
 
   async createAnalysis(
     userId: string,
@@ -91,6 +99,34 @@ export class AnalysesService {
       },
     });
 
+    // --- Automatic Triggering ---
+    // 1. Auto-assign specialist if risk is HIGH/CRITICAL
+    if (analysis.riskLevel === 'HIGH' || analysis.riskLevel === 'CRITICAL') {
+      try {
+        await this.caseAssignments.autoAssign({
+          patientId: userId,
+          analysisId: analysis.id,
+          disease: data.testName,
+          priority: analysis.riskLevel === 'CRITICAL' ? 'HIGH' : 'NORMAL',
+          notes: `Automatic assignment triggered by ${analysis.riskLevel} risk detection in ${data.testName} analysis.`,
+        });
+      } catch (err) {
+        this.logger.error(`Auto-assignment failed for analysis ${analysis.id}:`, err);
+      }
+    }
+
+    // 2. Trigger smart alert
+    try {
+      await this.alerts.triggerRiskAlert(
+        userId,
+        data.testName,
+        analysis.riskLevel,
+        data.results[data.testName]?.confidence || 0,
+      );
+    } catch (err) {
+      this.logger.error(`Risk alert triggering failed for analysis ${analysis.id}:`, err);
+    }
+
     return this.mapAnalysis(analysis);
   }
 
@@ -131,9 +167,13 @@ export class AnalysesService {
     }
 
     if (userRole === 'PATIENT' && analysis.userId !== userId) {
-      throw new ForbiddenException(
-        'You do not have permission to view this analysis',
-      );
+      // Check for caregiver consent
+      const hasConsent = await this.familyConsent.checkAccess(analysis.userId, userId);
+      if (!hasConsent) {
+        throw new ForbiddenException(
+          'You do not have permission to view this analysis',
+        );
+      }
     }
 
     return this.mapAnalysis(analysis);

@@ -103,6 +103,8 @@ class SubmitAnswersResponse(BaseModel):
     stage: SessionStage
     enriched_features: Dict[str, Any] = Field(default_factory=dict)
     feature_count: int = 0
+    next_questions: List[FollowUpQuestion] = Field(default_factory=list)
+    needs_more_questions: bool = False
 
 
 class FinalReportRequest(BaseModel):

@@ -65,20 +65,23 @@ def build_reasoning(
     fallback_models: Sequence[str] | None = None,
 ) -> list[str]:
     reasoning: list[str] = []
+    
+    # Case-insensitive lookup
+    f = {str(k).lower(): v for k, v in features.items()}
 
-    glucose = _to_float(features.get("glucose"))
+    glucose = _to_float(f.get("glucose") or f.get("avg_glucose_level"))
     if glucose is not None and glucose > 140:
         reasoning.append("High glucose detected")
 
-    blood_pressure = _to_float(features.get("blood_pressure"))
+    blood_pressure = _to_float(f.get("blood_pressure") or f.get("bp"))
     if blood_pressure is not None and blood_pressure > 130:
         reasoning.append("Elevated blood pressure detected")
 
-    cholesterol = _to_float(features.get("cholesterol"))
+    cholesterol = _to_float(f.get("cholesterol") or f.get("chol"))
     if cholesterol is not None and cholesterol > 200:
         reasoning.append("Elevated cholesterol detected")
 
-    if _has_neurological_symptoms(features, symptoms):
+    if _has_neurological_symptoms(f, symptoms):
         reasoning.append("Neurological stroke-related symptoms detected")
 
     for model_name in selected_models:

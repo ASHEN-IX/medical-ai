@@ -22,26 +22,16 @@ logger = logging.getLogger(__name__)
 
 
 class LiverService:
-    def _risk_level(self, probability: float) -> str:
-        if probability >= 0.75:
-            return "HIGH"
-        if probability >= 0.4:
-            return "MEDIUM"
-        return "LOW"
+    def _risk_level(self, liver_detected: bool) -> str:
+        return "HIGH" if liver_detected else "LOW"
 
     def _recommendations(self, risk_level: str) -> list[str]:
         if risk_level == "HIGH":
             return ["Refer to hepatology for further assessment", "Consider imaging and liver panel tests"]
-        if risk_level == "MEDIUM":
-            return ["Repeat labs and monitor liver enzymes", "Review medication and alcohol exposure"]
         return ["Maintain regular check-ups and healthy lifestyle"]
 
     def _build_feature_frame(self, payload: LiverRequest) -> pd.DataFrame:
         # Map incoming payload to the feature names expected by the trained model
-        # Expected feature names (observed from model.feature_names_in_):
-        # ['Age','Gender','Total_Bilirubin','Direct_Bilirubin','Alkaline_Phosphotase',
-        #  'Alamine_Aminotransferase','Aspartate_Aminotransferase','Total_Protiens',
-        #  'Albumin','Albumin_and_Globulin_Ratio']
         row: dict[str, Any] = {
             "Age": int(payload.age),
             "Gender": None,
@@ -69,7 +59,7 @@ class LiverService:
                     encoded = liver_enc.transform([str(payload.gender).title()])[0]
                     row["Gender"] = encoded
                 except Exception:
-                    # Fallback: map common strings to simple numeric values used in some datasets
+                    # Fallback
                     gender_val = None
                     if isinstance(payload.gender, str):
                         g = payload.gender.strip().lower()
@@ -79,7 +69,7 @@ class LiverService:
                             gender_val = 0
                     row["Gender"] = gender_val
         else:
-            # Fallback: map common strings to simple numeric values used in some datasets
+            # Fallback
             gender_val = None
             if isinstance(payload.gender, str):
                 g = payload.gender.strip().lower()
@@ -153,51 +143,23 @@ class LiverService:
             logger.exception("Liver model inference failed")
             raise RuntimeError(f"Model inference failed: {exc}") from exc
 
-        # Try to obtain probability safely; fall back to binary prediction when proba path fails
-        liver_prob = None
-        if hasattr(model, "predict_proba"):
-            try:
-                probs = np.asarray(model.predict_proba(feature_frame)[0], dtype=np.float32)
-                liver_prob = float(probs[1]) if probs.size >= 2 else float(probs[0])
-            except AttributeError as ae:
-                # Handle missing legacy attributes (e.g., multi_class on old LogisticRegression)
-                msg = str(ae)
-                import re
-
-                m = re.search(r"has no attribute '(.+?)'", msg)
-                if m and m.group(1) == "multi_class":
-                    try:
-                        setattr(model, "multi_class", "ovr")
-                        probs = np.asarray(model.predict_proba(feature_frame)[0], dtype=np.float32)
-                        liver_prob = float(probs[1]) if probs.size >= 2 else float(probs[0])
-                    except Exception:
-                        liver_prob = None
-                else:
-                    liver_prob = None
-            except Exception:
-                liver_prob = None
-
-        if liver_prob is None:
-            liver_prob = float(prediction_raw) if isinstance(prediction_raw, (int, float)) else 0.0
-
-        liver_prob = max(0.0, min(1.0, liver_prob))
-        # Use binary prediction (0 or 1) directly for disease detection, not probability threshold
-        liver_detected = bool(prediction_raw == 1)
-        confidence = liver_prob if liver_detected else 1.0 - liver_prob
+        # Binary classification only
+        liver_detected = bool(int(round(float(prediction_raw))) == 1)
+        liver_prob = 1.0 if liver_detected else 0.0
+        confidence = 1.0
+        risk_level = self._risk_level(liver_detected)
 
         duration_ms = int((time.time() - started) * 1000)
         model_loader.record_response_time("liver_pred", duration_ms)
-
-        risk_level = self._risk_level(liver_prob)
 
         return LiverResponse(
             success=True,
             prediction=LiverPredictionResult(
                 liver_disease=liver_detected,
                 risk_level=risk_level,
-                confidence_score=round(confidence, 4),
-                liver_probability=round(liver_prob, 4),
-                class_probabilities=LiverClassProbabilities(liver_disease=round(liver_prob, 4), non_liver_disease=round(1.0 - liver_prob, 4)),
+                confidence_score=confidence,
+                liver_probability=liver_prob,
+                class_probabilities=LiverClassProbabilities(liver_disease=liver_prob, non_liver_disease=1.0 - liver_prob),
             ),
             recommendations=self._recommendations(risk_level),
             metadata=Metadata(

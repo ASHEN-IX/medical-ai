@@ -76,13 +76,14 @@ class StagedDiagnosisService:
         image: Optional[str],
         request_id: str,
     ) -> InitialAnalysisResponse:
+        needs_follow_up = False
         started = time.perf_counter()
         session_id = f"sess_{uuid4().hex[:16]}"
         normalized_report_type = self._normalize_report_type(report_type)
 
         gateway_request = GatewayAnalyzeRequest(
             report_type=normalized_report_type,
-            features={k: v for k, v in features.items() if isinstance(v, (int, float))},
+            features={k: v for k, v in features.items() if isinstance(v, (int, float, str, bool))},
             raw_text=raw_text,
             include_explanation=include_explanation,
             symptoms=symptoms,
@@ -105,11 +106,7 @@ class StagedDiagnosisService:
                     if pred.get("autism_detected"):
                         autism_detected = True
                         break
-            if autism_detected:
-                selected_disease = "autism"
-            needs_follow_up = autism_detected
-        else:
-            needs_follow_up = self._should_follow_up(overall_risk, max_confidence)
+        needs_follow_up = self._should_follow_up(overall_risk, max_confidence)
 
         questions: List[FollowUpQuestion] = []
 
@@ -206,9 +203,31 @@ class StagedDiagnosisService:
 
         enriched = self.enrichment.enrich(session.follow_up_questions, answers)
 
-        session.answers = answers
-        session.enriched_features = enriched
-        session.stage = SessionStage.ANSWERS_SUBMITTED
+        session.answers.extend(answers)
+        session.enriched_features.update(enriched)
+
+        merged_features = dict(session.features)
+        merged_features.update(session.enriched_features)
+
+        next_questions: List[FollowUpQuestion] = []
+        if session.selected_disease:
+            generated = await self.question_generator.generate_questions(
+                predicted_disease=session.selected_disease,
+                confidence=session.confidence,
+                overall_risk=session.overall_risk,
+                features=merged_features,
+                symptoms=[],
+                model_outputs=session.initial_prediction.get("model_outputs", {}),
+            )
+            seen_texts = {q.text.strip().lower() for q in session.follow_up_questions}
+            next_questions = [q for q in generated if q.text.strip().lower() not in seen_texts]
+
+        if next_questions:
+            session.follow_up_questions.extend(next_questions)
+            session.stage = SessionStage.FOLLOW_UP_PENDING
+        else:
+            session.stage = SessionStage.ANSWERS_SUBMITTED
+
         session.updated_at = datetime.now(timezone.utc)
         self.store.put(session)
 
@@ -219,9 +238,11 @@ class StagedDiagnosisService:
 
         return SubmitAnswersResponse(
             session_id=session_id,
-            stage=SessionStage.ANSWERS_SUBMITTED,
-            enriched_features=enriched,
-            feature_count=len(enriched),
+            stage=session.stage,
+            enriched_features=session.enriched_features,
+            feature_count=len(session.enriched_features),
+            next_questions=next_questions,
+            needs_more_questions=bool(next_questions),
         )
 
     # ------------------------------------------------------------------
@@ -352,9 +373,8 @@ class StagedDiagnosisService:
 
     def _should_follow_up(self, overall_risk: str, confidence: float) -> bool:
         risk = overall_risk.strip().upper()
+        # In binary mode, any HIGH risk triggers follow-up
         if risk == "HIGH":
-            return True
-        if risk == "MEDIUM" and confidence >= 0.45:
             return True
         return False
 

@@ -50,6 +50,14 @@ async function bootstrap() {
     .addTag('doctor-reviews', 'Doctor review and feedback endpoints')
     .addTag('messages', 'Doctor-patient messaging endpoints')
     .addTag('logs', 'System audit logs endpoints')
+    .addTag('case-assignments', 'Specialist case assignment endpoints')
+    .addTag('appointments', 'Appointment management endpoints')
+    .addTag('alerts', 'Smart alerts and notifications')
+    .addTag('manual-tests', 'Manual disease testing endpoints')
+    .addTag('prescriptions', 'Prescription and medication management')
+    .addTag('transportation', 'Transportation booking endpoints')
+    .addTag('prevention-plans', 'Personalized prevention plans')
+    .addTag('consultation-history', 'Unified consultation timeline')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

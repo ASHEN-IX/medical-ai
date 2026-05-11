@@ -17,6 +17,7 @@ import {
   FinalReportPayload,
   FetchQuestionsPayload,
 } from './ai-proxy.service';
+import { AuditLog } from '../../common/decorators/audit-log.decorator';
 
 @ApiTags('ai')
 @Controller('ai')
@@ -27,6 +28,7 @@ export class AiProxyController {
 
   @Post('analyze')
   @ApiOperation({ summary: 'Run AI analysis on medical data (proxied through backend)' })
+  @AuditLog({ resource: 'Analysis', action: 'CREATE' })
   async analyze(@Request() req: any, @Body() payload: AiAnalyzePayload) {
     return this.aiProxyService.analyze(req.user.id, payload);
   }
@@ -45,6 +47,7 @@ export class AiProxyController {
 
   @Post('diagnosis/analyze')
   @ApiOperation({ summary: 'Start staged diagnosis with initial analysis + follow-up questions' })
+  @AuditLog({ resource: 'StagedDiagnosis', action: 'CREATE' })
   async stagedAnalyze(@Request() req: any, @Body() payload: StagedAnalyzePayload) {
     return this.aiProxyService.stagedAnalyze(req.user.id, payload);
   }
@@ -63,6 +66,7 @@ export class AiProxyController {
 
   @Post('diagnosis/final-report')
   @ApiOperation({ summary: 'Generate final enriched diagnosis report' })
+  @AuditLog({ resource: 'StagedDiagnosis', action: 'FINALIZE' })
   async finalReport(@Request() req: any, @Body() payload: FinalReportPayload) {
     return this.aiProxyService.generateFinalReport(req.user.id, payload);
   }

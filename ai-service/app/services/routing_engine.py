@@ -43,8 +43,44 @@ class RoutingEngine:
 
         # Fallback for auto-detection if no specific type was detected
         if normalized_report_type in {"auto", "mixed"}:
-            # ... existing auto-detection logic if needed ...
-            pass
+            # Heuristic-based routing for auto / mixed reports.
+            # Check for strong indicators first.
+            if self._has_stroke_indicators(features, symptoms):
+                selected_models.add("stroke")
+
+            if self._has_kidney_indicators(features, symptoms):
+                selected_models.add("kidney")
+
+            # Diabetes indicators: glucose, hba1c
+            glucose = _to_float(features.get("glucose"))
+            hba1c = _to_float(features.get("hba1c"))
+            if (glucose is not None and glucose > 125) or (hba1c is not None and hba1c >= 6.5):
+                selected_models.add("diabetes")
+
+            # Heart indicators: troponin, ecg, chest pain in symptoms
+            troponin = _to_float(features.get("troponin"))
+            if troponin is not None and troponin > 0.04:
+                selected_models.add("heart")
+            if symptoms and any("chest" in str(s).lower() or "pain" in str(s).lower() for s in symptoms):
+                selected_models.add("heart")
+
+            # Autism indicators: mention in symptoms or behavioral markers
+            if symptoms and any("autism" in str(s).lower() or "behavior" in str(s).lower() for s in symptoms):
+                selected_models.add("autism_pred")
+
+            # If images present, consider autism_dl as an option
+            if has_image:
+                selected_models.add("autism_dl")
+
+            # If heuristics found nothing, fall back to a safe default set
+            if not selected_models:
+                default_models = {"diabetes", "heart", "kidney"}
+                selected_models.update(default_models)
+
+            # Return a sorted list by priority
+            result = sorted(selected_models, key=self._sort_order)
+            logger.info("Auto/mixed routing selected models: %s", result)
+            return result
 
     def llm_based_routing(
         self,

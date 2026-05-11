@@ -23,18 +23,12 @@ logger = logging.getLogger(__name__)
 
 
 class HeartService:
-    def _risk_level(self, probability: float) -> str:
-        if probability >= 0.75:
-            return "HIGH"
-        if probability >= 0.4:
-            return "MEDIUM"
-        return "LOW"
+    def _risk_level(self, heart_detected: bool) -> str:
+        return "HIGH" if heart_detected else "LOW"
 
     def _recommendations(self, risk_level: str) -> list[str]:
         if risk_level == "HIGH":
             return ["Urgent cardiology referral recommended", "Consider ECG and cardiac enzymes"]
-        if risk_level == "MEDIUM":
-            return ["Follow-up cardiovascular assessment", "Lifestyle counseling for risk reduction"]
         return ["Continue routine monitoring and healthy lifestyle"]
 
     def _build_feature_frame(self, payload: HeartRequest) -> pd.DataFrame:
@@ -93,10 +87,8 @@ class HeartService:
                         # preds may be probabilities for binary classification
                         if hasattr(preds, "shape") and getattr(preds, "ndim", 1) == 1:
                             prediction_raw = int(preds[0] >= 0.5)
-                            proba_est = float(preds[0])
                         else:
                             prediction_raw = int(preds[0][1] >= 0.5)
-                            proba_est = float(preds[0][1])
                     except Exception:
                         prediction_raw = None
 
@@ -127,60 +119,23 @@ class HeartService:
             logger.exception("Heart model inference failed")
             raise RuntimeError(f"Model inference failed: {exc}") from exc
 
-        # Determine probability
-        heart_prob = None
-        # If we previously estimated probability from Booster, use it
-        if "proba_est" in locals():
-            heart_prob = float(locals()["proba_est"])
-
-        if heart_prob is None:
-            # Try using booster predict to get probabilities without sklearn wrapper
-            try:
-                if hasattr(model, "get_booster"):
-                    import xgboost as xgb
-
-                    arr = feature_frame.values if hasattr(feature_frame, "values") else feature_frame
-                    dmat = xgb.DMatrix(arr)
-                    booster = model.get_booster()
-                    preds = booster.predict(dmat)
-                    if hasattr(preds, "ndim") and preds.ndim == 1:
-                        heart_prob = float(preds[0])
-                    else:
-                        heart_prob = float(preds[0][1])
-            except Exception:
-                heart_prob = None
-
-        if heart_prob is None:
-            if hasattr(model, "predict_proba"):
-                try:
-                    probs = np.asarray(model.predict_proba(feature_frame)[0], dtype=np.float32)
-                    if probs.size >= 2:
-                        heart_prob = float(probs[1])
-                    else:
-                        heart_prob = float(probs[0])
-                except Exception:
-                    heart_prob = float(prediction_raw) if isinstance(prediction_raw, (int, float)) else 0.0
-            else:
-                heart_prob = float(prediction_raw) if isinstance(prediction_raw, (int, float)) else 0.0
-
-        heart_prob = max(0.0, min(1.0, heart_prob))
-        # Use binary prediction (0 or 1) directly for disease detection, not probability threshold
-        heart_detected = bool(prediction_raw == 1)
-        confidence = heart_prob if heart_detected else 1.0 - heart_prob
+        # Binary classification only
+        heart_detected = bool(int(round(float(prediction_raw))) == 1)
+        heart_prob = 1.0 if heart_detected else 0.0
+        confidence = 1.0
+        risk_level = self._risk_level(heart_detected)
 
         duration_ms = int((time.time() - started) * 1000)
         model_loader.record_response_time("heart_pred", duration_ms)
-
-        risk_level = self._risk_level(heart_prob)
 
         return HeartResponse(
             success=True,
             prediction=HeartPredictionResult(
                 heart_disease=heart_detected,
                 risk_level=risk_level,
-                confidence_score=round(confidence, 4),
-                heart_probability=round(heart_prob, 4),
-                class_probabilities=HeartClassProbabilities(heart_disease=round(heart_prob, 4), non_heart_disease=round(1.0 - heart_prob, 4)),
+                confidence_score=confidence,
+                heart_probability=heart_prob,
+                class_probabilities=HeartClassProbabilities(heart_disease=heart_prob, non_heart_disease=1.0 - heart_prob),
             ),
             recommendations=self._recommendations(risk_level),
             metadata=Metadata(

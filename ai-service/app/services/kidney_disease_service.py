@@ -42,12 +42,8 @@ class KidneyDiseaseService:
         "ane": 0,
     }
 
-    def _risk_level(self, probability: float) -> str:
-        if probability >= 0.8:
-            return "HIGH"
-        if probability >= 0.45:
-            return "MEDIUM"
-        return "LOW"
+    def _risk_level(self, ckd_detected: bool) -> str:
+        return "HIGH" if ckd_detected else "LOW"
 
     def _recommendations(self, risk_level: str) -> list[str]:
         if risk_level == "HIGH":
@@ -55,12 +51,6 @@ class KidneyDiseaseService:
                 "Urgent nephrology follow-up recommended",
                 "Order comprehensive renal panel and urinalysis",
                 "Assess blood pressure and diabetes control",
-            ]
-        if risk_level == "MEDIUM":
-            return [
-                "Clinical follow-up and repeat screening recommended",
-                "Monitor creatinine, hemoglobin, and urine protein trends",
-                "Review cardiovascular and metabolic risk factors",
             ]
         return [
             "Current model risk appears low",
@@ -91,7 +81,10 @@ class KidneyDiseaseService:
 
         expected_columns = model_loader.kidney_feature_names
         if expected_columns:
-            normalized = {column: frame.iloc[0].get(column, 0) for column in expected_columns}
+            # Case-insensitive mapping from our engineered frame to the model's expected columns
+            row_engineered = frame.iloc[0].to_dict()
+            row_lower = {k.lower(): v for k, v in row_engineered.items()}
+            normalized = {column: row_lower.get(column.lower(), 0) for column in expected_columns}
             frame = pd.DataFrame([normalized], columns=expected_columns)
 
         return frame
@@ -99,36 +92,6 @@ class KidneyDiseaseService:
     def _is_ckd_label(self, label: Any) -> bool:
         text = str(label).strip().lower()
         return text in {"1", "ckd", "yes", "positive", "true"}
-
-    def _probabilities(self, model: Any, scaled_input: Any, predicted_is_ckd: bool) -> tuple[float, float]:
-        if hasattr(model, "predict_proba"):
-            probs = np.asarray(model.predict_proba(scaled_input)[0], dtype=np.float32)
-            if probs.ndim == 1 and probs.size >= 2:
-                classes = getattr(model, "classes_", None)
-                if classes is not None and len(classes) == probs.size:
-                    class_map = {str(classes[idx]).strip().lower(): float(probs[idx]) for idx in range(probs.size)}
-                    ckd_prob = (
-                        class_map.get("1")
-                        or class_map.get("ckd")
-                        or class_map.get("yes")
-                        or class_map.get("positive")
-                    )
-                    # If still None, use index-based lookup for class 1 probability
-                    if ckd_prob is None:
-                        # Always use probs[1] when CKD detected (binary prediction=1)
-                        ckd_prob = float(probs[1]) if predicted_is_ckd else float(probs[0])
-                else:
-                    ckd_prob = float(probs[1])
-            elif probs.ndim == 1 and probs.size == 1:
-                ckd_prob = float(probs[0]) if predicted_is_ckd else 1.0 - float(probs[0])
-            else:
-                ckd_prob = 1.0 if predicted_is_ckd else 0.0
-        else:
-            ckd_prob = 1.0 if predicted_is_ckd else 0.0
-
-        ckd_prob = max(0.0, min(1.0, float(ckd_prob)))
-        non_ckd_prob = 1.0 - ckd_prob
-        return ckd_prob, non_ckd_prob
 
     def predict(self, payload: KidneyDiseaseRequest, request_id: str) -> KidneyDiseaseResponse:
         started = time.perf_counter()
@@ -144,9 +107,9 @@ class KidneyDiseaseService:
         try:
             scaled_input = scaler.transform(feature_frame)
             prediction_raw = model.predict(scaled_input)[0]
-            # Ensure binary classification - round to nearest 0 or 1
+            # Ensure binary classification
             binary_prediction = int(round(float(prediction_raw)))
-        except Exception as exc:  # pragma: no cover - runtime dependency behavior
+        except Exception as exc:  # pragma: no cover
             logger.exception("Kidney model inference failed")
             raise RuntimeError("Model inference failed") from exc
 
@@ -155,13 +118,16 @@ class KidneyDiseaseService:
         if label_encoder is not None:
             try:
                 decoded_label = label_encoder.inverse_transform([int(binary_prediction)])[0]
-            except Exception:  # pragma: no cover - runtime dependency behavior
+            except Exception:  # pragma: no cover
                 decoded_label = binary_prediction
 
         ckd_detected = self._is_ckd_label(decoded_label)
-        ckd_prob, non_ckd_prob = self._probabilities(model, scaled_input, ckd_detected)
-        confidence = ckd_prob if ckd_detected else non_ckd_prob
-        risk_level = self._risk_level(ckd_prob)
+        
+        # Binary classification only
+        ckd_prob = 1.0 if ckd_detected else 0.0
+        non_ckd_prob = 1.0 if not ckd_detected else 0.0
+        confidence = 1.0
+        risk_level = self._risk_level(ckd_detected)
 
         duration_ms = int((time.perf_counter() - started) * 1000)
         model_loader.record_response_time("kidney_pred", duration_ms)
@@ -171,11 +137,11 @@ class KidneyDiseaseService:
             prediction=KidneyDiseasePredictionResult(
                 ckd_detected=ckd_detected,
                 risk_level=risk_level,
-                confidence_score=round(confidence, 4),
-                ckd_probability=round(ckd_prob, 4),
+                confidence_score=confidence,
+                ckd_probability=ckd_prob,
                 class_probabilities=KidneyClassProbabilities(
-                    ckd=round(ckd_prob, 4),
-                    non_ckd=round(non_ckd_prob, 4),
+                    ckd=ckd_prob,
+                    non_ckd=non_ckd_prob,
                 ),
             ),
             recommendations=self._recommendations(risk_level),
