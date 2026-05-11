@@ -49,7 +49,7 @@ export class AppointmentsService {
       },
     });
 
-    if (conflict) {
+    if (conflict && data.type !== 'TELECONSULTATION') {
       throw new BadRequestException('Doctor has a scheduling conflict at this time');
     }
 

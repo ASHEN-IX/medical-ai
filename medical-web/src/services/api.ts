@@ -163,8 +163,15 @@ export interface ManualModelRunResponse {
   failures?: Record<string, string>;
 }
 
+const getAiGatewayUrl = () => {
+  if (typeof window !== "undefined") {
+    return `${window.location.protocol}//${window.location.hostname}:8001`;
+  }
+  return process.env.NEXT_PUBLIC_AI_GATEWAY_URL || "http://localhost:8001";
+};
+
 const aiGatewayApi = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_AI_GATEWAY_URL || "http://localhost:8001",
+  baseURL: getAiGatewayUrl(),
   timeout: 60000,
   headers: { "Content-Type": "application/json" },
 });

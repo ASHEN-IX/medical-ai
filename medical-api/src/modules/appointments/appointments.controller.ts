@@ -18,6 +18,7 @@ export class AppointmentsController {
     @Request() req: any,
     @Body() body: {
       doctorId: string;
+      patientId?: string;
       caseAssignmentId?: string;
       scheduledAt: string;
       durationMinutes?: number;
@@ -25,7 +26,10 @@ export class AppointmentsController {
       notes?: string;
     },
   ) {
-    return this.service.create({ patientId: req.user.id, ...body });
+    const patientId = (req.user.role === 'DOCTOR' || req.user.role === 'ADMIN') && body.patientId 
+      ? body.patientId 
+      : req.user.id;
+    return this.service.create({ ...body, patientId });
   }
 
   @Get('my-appointments')

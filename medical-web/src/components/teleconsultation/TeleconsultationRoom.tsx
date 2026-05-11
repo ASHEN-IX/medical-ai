@@ -6,9 +6,10 @@ import { useSocket } from "@/context/SocketContext";
 interface Props {
   roomId: string;
   userId: string;
+  userRole?: string;
 }
 
-export default function TeleconsultationRoom({ roomId, userId }: Props) {
+export default function TeleconsultationRoom({ roomId, userId, userRole }: Props) {
   const { socket, connected } = useSocket();
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
@@ -19,14 +20,23 @@ export default function TeleconsultationRoom({ roomId, userId }: Props) {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const peerConnection = useRef<RTCPeerConnection | null>(null);
-  const videoElement = remoteVideoRef as React.RefObject<HTMLVideoElement & { srcObject: MediaStream | null }>;
-  const localVideoElement = localVideoRef as React.RefObject<HTMLVideoElement & { srcObject: MediaStream | null }>;
+  
+  const makingOffer = useRef(false);
+  const ignoreOffer = useRef(false);
 
   const configuration: RTCConfiguration = {
-    iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+    iceServers: [
+      { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:stun1.l.google.com:19302" },
+      { urls: "stun:stun2.l.google.com:19302" }
+    ],
   };
 
   const createPeerConnection = useCallback(() => {
+    if (peerConnection.current) {
+      peerConnection.current.close();
+    }
+
     const pc = new RTCPeerConnection(configuration);
 
     pc.onicecandidate = (event) => {
@@ -36,30 +46,40 @@ export default function TeleconsultationRoom({ roomId, userId }: Props) {
     };
 
     pc.ontrack = (event) => {
-      setRemoteStream(event.streams[0]);
+      if (event.streams && event.streams[0]) {
+        setRemoteStream(event.streams[0]);
+        setStatus("active");
+      }
     };
 
+    pc.onnegotiationneeded = async () => {
+      try {
+        if (pc.signalingState !== "stable") return;
+        makingOffer.current = true;
+        await pc.setLocalDescription();
+        socket?.emit("offer", { roomId, offer: pc.localDescription });
+      } catch (err) {
+        console.error("Negotiation error:", err);
+      } finally {
+        makingOffer.current = false;
+      }
+    };
+
+    pc.oniceconnectionstatechange = () => {
+      if (pc.iceConnectionState === "failed") {
+        pc.restartIce();
+      }
+    };
+
+    peerConnection.current = pc;
     return pc;
   }, [roomId, socket]);
 
-  const startCall = useCallback(async () => {
-    if (!socket || !localStream) return;
-
-    peerConnection.current = createPeerConnection();
-    localStream.getTracks().forEach((track) => {
-      peerConnection.current?.addTrack(track, localStream);
-    });
-
-    const offer = await peerConnection.current.createOffer();
-    await peerConnection.current.setLocalDescription(offer);
-    socket.emit("offer", { roomId, offer });
-    setStatus("active");
-  }, [localStream, roomId, socket, createPeerConnection]);
-
   useEffect(() => {
+    let stream: MediaStream | null = null;
     async function setupStream() {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
+        stream = await navigator.mediaDevices.getUserMedia({
           video: true,
           audio: true,
         });
@@ -68,65 +88,103 @@ export default function TeleconsultationRoom({ roomId, userId }: Props) {
         console.error("Error accessing media devices:", err);
       }
     }
-
     setupStream();
 
     return () => {
-      localStream?.getTracks().forEach((track) => track.stop());
+      stream?.getTracks().forEach((track) => track.stop());
+      if (peerConnection.current) {
+        peerConnection.current.close();
+        peerConnection.current = null;
+      }
     };
   }, []);
 
   useEffect(() => {
-    if (localVideoElement.current) {
-      localVideoElement.current.srcObject = localStream;
+    if (localVideoRef.current && localStream) {
+      localVideoRef.current.srcObject = localStream;
     }
-  }, [localStream, localVideoElement]);
+  }, [localStream]);
 
   useEffect(() => {
-    if (videoElement.current) {
-      videoElement.current.srcObject = remoteStream;
+    if (remoteVideoRef.current && remoteStream) {
+      remoteVideoRef.current.srcObject = remoteStream;
     }
-  }, [remoteStream, videoElement]);
+  }, [remoteStream]);
 
   useEffect(() => {
-    if (!socket || !connected) return;
+    if (!socket || !connected || !localStream) return;
 
-    socket.emit("joinRoom", { roomId });
+    const pc = createPeerConnection();
 
-    socket.on("userJoined", () => {
-      startCall();
+    socket.emit("joinRoom", { roomId }, (response: any) => {
+      if (pc.signalingState === "closed") return;
+      localStream.getTracks().forEach((track) => {
+        if (pc.signalingState !== "closed") {
+          pc.addTrack(track, localStream);
+        }
+      });
     });
 
-    socket.on("offer", async ({ offer, from }) => {
-      if (!peerConnection.current) {
-        peerConnection.current = createPeerConnection();
-        localStream?.getTracks().forEach((track) => {
-          peerConnection.current?.addTrack(track, localStream);
-        });
+    socket.on("offer", async ({ offer }) => {
+      try {
+        const pc = peerConnection.current;
+        if (!pc || pc.signalingState === "closed") return;
+
+        const description = new RTCSessionDescription(offer);
+        const offerCollision = (description.type === "offer") &&
+                               (makingOffer.current || pc.signalingState !== "stable");
+
+        // The doctor is IMPOLITE (ignores incoming offers on collision)
+        // The patient is POLITE (yields and accepts incoming offers on collision)
+        ignoreOffer.current = userRole === "DOCTOR" && offerCollision;
+        if (ignoreOffer.current) {
+          console.log("Ignoring offer due to collision (impolite peer)");
+          return;
+        }
+
+        await pc.setRemoteDescription(description);
+        if (description.type === "offer") {
+          await pc.setLocalDescription();
+          socket.emit("answer", { roomId, answer: pc.localDescription });
+        }
+      } catch (err) {
+        console.error("Error handling offer:", err);
       }
-      await peerConnection.current.setRemoteDescription(new RTCSessionDescription(offer));
-      const answer = await peerConnection.current.createAnswer();
-      await peerConnection.current.setLocalDescription(answer);
-      socket.emit("answer", { roomId, answer });
-      setStatus("active");
     });
 
     socket.on("answer", async ({ answer }) => {
-      await peerConnection.current?.setRemoteDescription(new RTCSessionDescription(answer));
+      try {
+        const pc = peerConnection.current;
+        if (!pc || pc.signalingState === "closed") return;
+        await pc.setRemoteDescription(new RTCSessionDescription(answer));
+      } catch (err) {
+        console.error("Error handling answer:", err);
+      }
     });
 
     socket.on("iceCandidate", async ({ candidate }) => {
-      await peerConnection.current?.addIceCandidate(new RTCIceCandidate(candidate));
+      try {
+        const pc = peerConnection.current;
+        if (!pc || pc.signalingState === "closed") return;
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (err) {
+        if (!ignoreOffer.current) {
+          console.error("Error adding ICE candidate:", err);
+        }
+      }
     });
 
     return () => {
       socket.emit("leaveRoom", { roomId });
-      socket.off("userJoined");
       socket.off("offer");
       socket.off("answer");
       socket.off("iceCandidate");
+      if (peerConnection.current) {
+        peerConnection.current.close();
+        peerConnection.current = null;
+      }
     };
-  }, [socket, connected, roomId, localStream, startCall, createPeerConnection]);
+  }, [socket, connected, roomId, localStream, createPeerConnection, userRole]);
 
   const toggleMute = () => {
     if (localStream) {
@@ -142,27 +200,46 @@ export default function TeleconsultationRoom({ roomId, userId }: Props) {
     }
   };
 
+  const retryConnection = () => {
+    window.location.reload();
+  };
+
   return (
-    <div className="relative flex h-[600px] w-full flex-col overflow-hidden rounded-3xl border border-white/10 bg-slate-900 shadow-2xl shadow-cyan-500/10">
+    <div className="relative flex h-[640px] w-full flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950 shadow-2xl shadow-cyan-500/5 group">
       {/* Remote Video (Full Size) */}
-      <div className="relative flex-1 bg-slate-800">
+      <div className="relative flex-1 bg-slate-900">
         <video
           ref={remoteVideoRef}
           autoPlay
           playsInline
-          className="h-full w-full object-cover"
+          className="h-full w-full object-cover grayscale-[0.2] transition-all duration-700 group-hover:grayscale-0"
         />
         {!remoteStream && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center space-y-4 bg-slate-900/60 backdrop-blur-md">
-            <div className="h-16 w-16 animate-pulse rounded-full bg-cyan-500/20" />
-            <p className="text-sm font-medium text-white/40">Waiting for participant...</p>
+          <div className="absolute inset-0 flex flex-col items-center justify-center space-y-6 bg-slate-950/80 backdrop-blur-xl">
+            <div className="relative">
+              <div className="h-20 w-20 animate-ping rounded-full bg-cyan-500/20 absolute inset-0" />
+              <div className="h-20 w-20 rounded-full border-2 border-cyan-500/30 flex items-center justify-center relative">
+                <div className="h-10 w-10 animate-spin rounded-full border-2 border-cyan-500 border-t-transparent" />
+              </div>
+            </div>
+            <div className="text-center px-6">
+              <p className="text-lg font-black text-white uppercase tracking-[0.2em]">Establishing Link</p>
+              <p className="text-xs text-white/40 mt-1">Waiting for participant to join encrypted channel...</p>
+              <button 
+                onClick={retryConnection}
+                className="mt-6 rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-2 text-[10px] font-bold text-cyan-400 uppercase tracking-widest hover:bg-cyan-500/20 transition-all"
+              >
+                Force Re-Sync
+              </button>
+            </div>
           </div>
         )}
         
-        {/* Remote Info Overlay */}
-        <div className="absolute left-6 top-6 flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-4 py-2 backdrop-blur-md">
-          <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
-          <span className="text-xs font-semibold text-white">Live Session</span>
+        <div className="absolute left-8 top-8 flex items-center gap-3 rounded-2xl border border-white/10 bg-black/40 px-5 py-2.5 backdrop-blur-xl">
+          <div className={`h-2 w-2 rounded-full ${remoteStream ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]' : 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.8)]'} animate-pulse`} />
+          <span className="text-[10px] font-black text-white uppercase tracking-widest">
+            {remoteStream ? 'Secure Uplink Active' : 'Signal Standby'}
+          </span>
         </div>
       </div>
 
@@ -185,11 +262,11 @@ export default function TeleconsultationRoom({ roomId, userId }: Props) {
       </div>
 
       {/* Controls */}
-      <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center gap-4 border-t border-white/10 bg-black/40 px-8 py-6 backdrop-blur-xl">
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center justify-center gap-6 rounded-3xl border border-white/10 bg-black/60 px-10 py-5 backdrop-blur-2xl transition-all duration-300 hover:bg-black/70 hover:border-white/20">
         <button
           onClick={toggleMute}
-          className={`flex h-12 w-12 items-center justify-center rounded-full border transition-all ${
-            isMuted ? "border-red-500/50 bg-red-500/20 text-red-400" : "border-white/10 bg-white/5 text-white hover:bg-white/10"
+          className={`flex h-14 w-14 items-center justify-center rounded-2xl border transition-all duration-300 ${
+            isMuted ? "border-red-500/50 bg-red-500/20 text-red-400" : "border-white/10 bg-white/5 text-white hover:bg-white/10 hover:scale-110"
           }`}
         >
           {isMuted ? (
@@ -201,15 +278,15 @@ export default function TeleconsultationRoom({ roomId, userId }: Props) {
 
         <button
           onClick={() => window.location.reload()}
-          className="flex h-14 w-14 items-center justify-center rounded-full bg-red-500 text-white shadow-lg shadow-red-500/40 transition-transform hover:scale-110 active:scale-95"
+          className="flex h-16 w-16 items-center justify-center rounded-2xl bg-red-600 text-white shadow-xl shadow-red-600/30 transition-all duration-300 hover:bg-red-500 hover:scale-110 active:scale-95"
         >
-          <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
+          <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
         </button>
 
         <button
           onClick={toggleVideo}
-          className={`flex h-12 w-12 items-center justify-center rounded-full border transition-all ${
-            isVideoOff ? "border-red-500/50 bg-red-500/20 text-red-400" : "border-white/10 bg-white/5 text-white hover:bg-white/10"
+          className={`flex h-14 w-14 items-center justify-center rounded-2xl border transition-all duration-300 ${
+            isVideoOff ? "border-red-500/50 bg-red-500/20 text-red-400" : "border-white/10 bg-white/5 text-white hover:bg-white/10 hover:scale-110"
           }`}
         >
           {isVideoOff ? (
@@ -222,4 +299,3 @@ export default function TeleconsultationRoom({ roomId, userId }: Props) {
     </div>
   );
 }
-

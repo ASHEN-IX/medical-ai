@@ -33,7 +33,7 @@ async function main() {
 
   const doctor = await prisma.user.create({
     data: {
-      name: 'Dr. Sarah Chen',
+      name: 'Dr. Sarah Chen (Internal Medicine)',
       email: 'doctor@medai.local',
       password: doctorPassword,
       role: 'DOCTOR',
@@ -58,7 +58,7 @@ async function main() {
 
   const doctor2 = await prisma.user.create({
     data: {
-      name: 'Dr. Michael Park',
+      name: 'Dr. Michael Park (Cardiology)',
       email: 'doctor2@medai.local',
       password: doctorPassword,
       role: 'DOCTOR',
@@ -92,7 +92,7 @@ async function main() {
 
   for (const spec of specialistData) {
     const specUser = await prisma.user.create({
-      data: { name: spec.name, email: spec.email, password: doctorPassword, role: 'DOCTOR' },
+      data: { name: `${spec.name} (${spec.specialty})`, email: spec.email, password: doctorPassword, role: 'DOCTOR' },
     });
     await prisma.doctorProfile.create({
       data: {

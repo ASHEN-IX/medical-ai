@@ -1,10 +1,16 @@
 "use client";
 import axios from "axios";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+const getApiBaseUrl = () => {
+  if (typeof window !== "undefined") {
+    // Dynamically use the hostname we are accessing from (e.g., 192.168.x.x)
+    return `${window.location.protocol}//${window.location.hostname}:4000`;
+  }
+  return process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+};
 
 export const apiClient = axios.create({
-  baseURL: API_BASE,
+  baseURL: getApiBaseUrl(),
   timeout: 20000,
   headers: {
     "Content-Type": "application/json",

@@ -91,7 +91,7 @@ export class NotificationsService {
       type: 'CASE_ASSIGNMENT',
       severity: 'INFO',
       title: 'Specialist Assigned',
-      message: `Dr. ${doctorName} (${specialty}) has been assigned to your ${disease} case.`,
+      message: `${doctorName} has been assigned to your ${disease} case.`,
       channels: ['in_app', 'email'],
       data: { disease, specialty, doctorName },
     });

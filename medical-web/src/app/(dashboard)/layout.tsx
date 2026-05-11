@@ -9,6 +9,10 @@ import { AIAnalysisProvider } from "@/hooks/useAIAnalysis";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchUnreadCount, fetchAlertUnreadCount } from "@/services/api";
 
+import Sidebar from "@/components/dashboard/Sidebar";
+import TopNavbar from "@/components/dashboard/TopNavbar";
+import LiveSessionBanner from "@/components/dashboard/LiveSessionBanner";
+
 const patientNav = [
   { href: "/diagnosis", label: "Diagnosis" },
   { href: "/manual-tests", label: "Manual Tests" },
@@ -53,10 +57,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   if (loading || !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
-        <div className="flex items-center gap-3">
-          <div className="h-5 w-5 animate-spin rounded-full border-2 border-cyan-400 border-t-transparent" />
-          <span className="text-slate-400">Loading...</span>
+      <div className="min-h-screen flex items-center justify-center bg-[#020617] text-white">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-cyan-400 border-t-transparent shadow-[0_0_15px_rgba(6,182,212,0.3)]" />
+          <span className="text-slate-400 font-medium tracking-wider">Syncing with MedAI...</span>
         </div>
       </div>
     );
@@ -66,65 +70,24 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   return (
     <AIAnalysisProvider>
-      <div className="min-h-screen bg-slate-950">
-        <header className="sticky top-0 z-30 border-b border-white/10 bg-slate-900/80 backdrop-blur-xl">
-          <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-            <Link href="/" className="text-lg font-semibold tracking-wide text-white">
-              MedAI <span className="text-cyan-400">Nexus</span>
-            </Link>
+      <div className="min-h-screen bg-[#050a14] selection:bg-cyan-500/30 selection:text-white">
+        {/* Ambient Background Glows */}
+        <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-cyan-500/5 blur-[120px]" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-purple-500/5 blur-[120px]" />
+        </div>
 
-            <nav className="flex items-center gap-1 text-sm font-medium">
-              {navItems.map((item) => {
-                const isActive = pathname === item.href;
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`rounded-lg px-3 py-1.5 transition ${isActive
-                        ? "bg-cyan-500/20 text-cyan-300"
-                        : "text-slate-400 hover:bg-white/10 hover:text-white"
-                      }`}
-                  >
-                    {item.label}
-                  </Link>
-                );
-              })}
+        <TopNavbar unreadCount={unreadCount} />
+        <Sidebar navItems={navItems} isDoctor={isDoctor} />
 
-              <Link
-                href="/messages"
-                className={`relative rounded-lg px-3 py-1.5 transition ${pathname === "/messages"
-                    ? "bg-cyan-500/20 text-cyan-300"
-                    : "text-slate-400 hover:bg-white/10 hover:text-white"
-                  }`}
-              >
-                Messages
-                {unreadCount > 0 && (
-                  <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-                    {unreadCount > 9 ? "9+" : unreadCount}
-                  </span>
-                )}
-              </Link>
-
-              <span className="mx-2 h-6 w-px bg-white/10" />
-
-              <div className="flex items-center gap-2">
-                <div className="text-right">
-                  <p className="text-sm text-slate-200">{user?.name || user?.email}</p>
-                  <p className="text-[10px] uppercase tracking-wider text-slate-500">{user?.role}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => logout()}
-                  className="rounded-lg bg-white/5 px-3 py-1.5 text-sm text-slate-300 hover:bg-white/10"
-                >
-                  Logout
-                </button>
-              </div>
-            </nav>
-          </div>
-        </header>
-
-        <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">{children}</main>
+        <div className="pl-64 pt-16 relative z-10">
+          <main className="p-8 mx-auto max-w-full">
+            <LiveSessionBanner />
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+              {children}
+            </div>
+          </main>
+        </div>
       </div>
     </AIAnalysisProvider>
   );

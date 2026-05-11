@@ -39,30 +39,31 @@ export default function HistoryPage() {
   };
 
   return (
-    <section className="mx-auto max-w-6xl space-y-6">
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl">
-        <h1 className="text-3xl font-bold text-white">Analysis History</h1>
-        <p className="mt-1 text-sm text-white/60">
-          Review past AI analyses and track your health over time.
+    <section className="mx-auto max-w-6xl space-y-8 animate-in">
+      <div className="glass-card p-8 border-cyan-500/10">
+        <p className="text-xs font-bold uppercase tracking-[0.4em] text-cyan-500/80">Medical Archive</p>
+        <h1 className="mt-2 text-4xl font-extrabold tracking-tight text-white">Analysis History</h1>
+        <p className="mt-2 text-slate-400 font-medium">
+          Review past AI diagnostics and track your health metrics over time.
         </p>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:w-[420px]">
-          <label className="space-y-1.5">
-            <span className="text-xs font-semibold uppercase tracking-wider text-white/50">Filter by date</span>
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:w-[480px]">
+          <div className="space-y-2">
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Filter by date</span>
             <input
               type="date"
               value={dateFilter}
               onChange={(e) => setDateFilter(e.target.value)}
-              className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/30"
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white outline-none transition focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20"
             />
-          </label>
+          </div>
 
-          <label className="space-y-1.5">
-            <span className="text-xs font-semibold uppercase tracking-wider text-white/50">Filter by risk</span>
+          <div className="space-y-2">
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Filter by risk</span>
             <select
               value={riskFilter}
               onChange={(e) => setRiskFilter(e.target.value as RiskLevel | "ALL")}
-              className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/30"
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white outline-none transition focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20"
             >
               <option value="ALL" className="bg-slate-900">All Levels</option>
               <option value="LOW" className="bg-slate-900">Low</option>
@@ -70,7 +71,7 @@ export default function HistoryPage() {
               <option value="HIGH" className="bg-slate-900">High</option>
               <option value="CRITICAL" className="bg-slate-900">Critical</option>
             </select>
-          </label>
+          </div>
         </div>
       </div>
 
@@ -96,7 +97,7 @@ export default function HistoryPage() {
                 type="button"
                 key={entry.id}
                 onClick={() => handleOpen(entry)}
-                className="w-full rounded-2xl border border-white/10 bg-white/5 p-5 text-left backdrop-blur-xl transition hover:border-white/20 hover:bg-white/10"
+                className="w-full glass-card p-6 text-left hover:bg-white/10 transition-all duration-300"
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="space-y-1">

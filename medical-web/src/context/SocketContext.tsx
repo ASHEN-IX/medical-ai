@@ -27,8 +27,14 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000';
-    const newSocket = io(socketUrl, {
+    const getSocketUrl = () => {
+      if (typeof window !== "undefined") {
+        return `${window.location.protocol}//${window.location.hostname}:4000`;
+      }
+      return process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000';
+    };
+
+    const newSocket = io(getSocketUrl(), {
       query: { userId: user.id },
       transports: ['websocket'],
     });

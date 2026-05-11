@@ -103,7 +103,7 @@ function ConfidenceBar({ value }: { value: number }) {
 
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl ${className}`}>
+    <div className={`glass-card p-6 ${className}`}>
       {children}
     </div>
   );
@@ -199,14 +199,17 @@ export default function ResultsPage() {
   return (
     <div className="space-y-8 animate-in">
       {/* Header */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Analysis Results</h1>
-          <p className="mt-1 text-sm text-slate-400">
-            {analysis.testName} -- {new Date(analysis.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
-          </p>
+      <div className="glass-card p-8 border-cyan-500/10">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.4em] text-cyan-500/80">Diagnostic Assessment</p>
+            <h1 className="mt-2 text-4xl font-extrabold tracking-tight text-white">{analysis.testName}</h1>
+            <p className="mt-1 text-slate-400 font-medium">
+              {new Date(analysis.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
+            </p>
+          </div>
+          <RiskBadge level={analysis.riskLevel} pulse={analysis.riskLevel === "CRITICAL"} />
         </div>
-        <RiskBadge level={analysis.riskLevel} pulse={analysis.riskLevel === "CRITICAL"} />
       </div>
 
       {/* Top row: Score + Key Findings + AI Insights */}

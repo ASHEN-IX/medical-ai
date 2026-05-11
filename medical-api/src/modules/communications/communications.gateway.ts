@@ -8,13 +8,13 @@ import {
   MessageBody,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Logger, UseGuards } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MessagesService } from '../messages/messages.service';
 
 @WebSocketGateway({
   cors: {
-    origin: '*', // In production, restrict this to your frontend URL
+    origin: '*',
   },
 })
 export class CommunicationsGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -22,8 +22,6 @@ export class CommunicationsGateway implements OnGatewayConnection, OnGatewayDisc
   server!: Server;
 
   private readonly logger = new Logger(CommunicationsGateway.name);
-
-  // Map of userId -> socketId to target specific users
   private userSockets = new Map<string, string>();
 
   constructor(
@@ -56,8 +54,6 @@ export class CommunicationsGateway implements OnGatewayConnection, OnGatewayDisc
     }
   }
 
-  // --- Chat Handlers ---
-
   @SubscribeMessage('sendMessage')
   async handleSendMessage(
     @ConnectedSocket() client: Socket,
@@ -66,14 +62,12 @@ export class CommunicationsGateway implements OnGatewayConnection, OnGatewayDisc
     const senderId = client.handshake.query.userId as string;
     if (!senderId) return;
 
-    // Save message via service
     const message = await this.messagesService.sendMessage(senderId, {
       conversationId: data.conversationId,
       content: data.content,
       receiverId: data.receiverId,
     });
 
-    // Notify receiver if online
     const receiverSocketId = this.userSockets.get(data.receiverId);
     if (receiverSocketId) {
       this.server.to(receiverSocketId).emit('newMessage', message);
@@ -81,8 +75,6 @@ export class CommunicationsGateway implements OnGatewayConnection, OnGatewayDisc
 
     return message;
   }
-
-  // --- Teleconsultation Signaling Handlers ---
 
   @SubscribeMessage('joinRoom')
   handleJoinRoom(
@@ -92,6 +84,7 @@ export class CommunicationsGateway implements OnGatewayConnection, OnGatewayDisc
     client.join(data.roomId);
     this.logger.log(`Client ${client.id} joined room: ${data.roomId}`);
     client.to(data.roomId).emit('userJoined', { socketId: client.id });
+    return { success: true };
   }
 
   @SubscribeMessage('leaveRoom')

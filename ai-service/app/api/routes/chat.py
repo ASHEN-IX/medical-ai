@@ -54,20 +54,8 @@ def _build_system_prompt(context: dict | None) -> str:
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat_with_ai(payload: ChatRequest, request: Request) -> ChatResponse:
-    try:
-        from openai import OpenAI
-    except ImportError:
-        pass
-
     groq_key = os.getenv("GROQ_API_KEY")
     openai_key = os.getenv("OPENAI_API_KEY")
-
-    if not groq_key and not openai_key:
-        raise HTTPException(
-            status_code=503,
-            detail={"code": "LLM_NOT_CONFIGURED", "message": "No LLM API key configured"},
-        )
-
     system_prompt = _build_system_prompt(payload.analysis_context)
 
     messages = [{"role": "system", "content": system_prompt}]
@@ -89,7 +77,7 @@ async def chat_with_ai(payload: ChatRequest, request: Request) -> ChatResponse:
                 temperature=0.7,
             )
             response_text = completion.choices[0].message.content
-        elif openai_key:
+        elif openai_key and not openai_key.startswith("sk-test"):
             from openai import OpenAI
             client = OpenAI(api_key=openai_key)
             completion = client.chat.completions.create(
@@ -100,7 +88,13 @@ async def chat_with_ai(payload: ChatRequest, request: Request) -> ChatResponse:
             )
             response_text = completion.choices[0].message.content
         else:
-            response_text = "I'm sorry, I can't process your request right now."
+            # Mock Fallback for Demo
+            response_text = (
+                "DEMO MODE: I am currently operating without a live LLM connection. "
+                "In a production environment, I would provide personalized medical insights based on your "
+                f"risk level ({payload.analysis_context.get('risk_level', 'LOW') if payload.analysis_context else 'LOW'}). "
+                "Please ensure valid API keys are configured in the .env file."
+            )
 
         rag_sources: list[str] = []
         try:

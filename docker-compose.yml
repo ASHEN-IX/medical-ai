@@ -13,9 +13,9 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_AI_GATEWAY_URL=http://localhost:8001
-      - NEXT_PUBLIC_API_URL=http://localhost:4000
-      - NEXT_PUBLIC_SOCKET_URL=http://localhost:4000
+      - NEXT_PUBLIC_AI_GATEWAY_URL=http://192.168.1.104:8001
+      - NEXT_PUBLIC_API_URL=http://192.168.1.104:4000
+      - NEXT_PUBLIC_SOCKET_URL=http://192.168.1.104:4000
       - NEXT_PUBLIC_APP_NAME=MedAI Nexus
       - NODE_ENV=development
     volumes:
@@ -76,7 +76,7 @@ services:
       - FASTAPI_ENV=development
       - FASTAPI_PORT=8001
       - FASTAPI_LOG_LEVEL=INFO
-      - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+      - CORS_ORIGINS=*
       - GROQ_API_KEY=${GROQ_API_KEY:-}
       - GROQ_MODEL=${GROQ_MODEL:-openai/gpt-oss-120b}
       - SENTENCE_TRANSFORMERS_HOME=/data/sentence_transformers

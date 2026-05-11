@@ -10,7 +10,10 @@ import {
   fetchFeedbackStats,
   type DoctorRequest,
   type DoctorReview,
+  createAppointment,
+  createTeleconsultation,
 } from "@/services/api";
+import { Video } from "lucide-react";
 
 const URGENCY_ORDER: Record<string, number> = {
   EMERGENCY: 0,
@@ -185,6 +188,37 @@ export default function DoctorQueuePage() {
     }
   };
 
+  const handleQuickSchedule = async (request: DoctorRequest) => {
+    if (!request.patientId || !user?.id) return;
+    setClaimingId(request.id);
+    try {
+      const now = new Date();
+      const scheduledAt = now.toISOString();
+      
+      const appt = await createAppointment({
+        doctorId: user.id,
+        patientId: request.patientId,
+        scheduledAt,
+        durationMinutes: 30,
+        type: "TELECONSULTATION",
+        notes: `Quick session for ${request.analysis?.testName || 'analysis'}`,
+      });
+      
+      if (appt.id) {
+        const tc = await createTeleconsultation(appt.id);
+        if (tc?.roomId) {
+          router.push(`/appointments/room/${tc.roomId}`);
+        } else {
+          router.push("/appointments");
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create quick session.");
+    } finally {
+      setClaimingId(null);
+    }
+  };
+
   if (authLoading || !user) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center text-white">
@@ -207,39 +241,44 @@ export default function DoctorQueuePage() {
   }
 
   return (
-    <section className="space-y-6 text-white">
+    <section className="space-y-8 text-white animate-in">
       {/* Header */}
-      <div className="rounded-3xl border border-white/10 bg-white/5 p-8 shadow-2xl backdrop-blur-xl">
-        <p className="text-sm uppercase tracking-[0.3em] text-white/50">Doctor Dashboard</p>
-        <h1 className="mt-3 text-4xl font-bold tracking-tight">Patient Queue</h1>
-        <div className="mt-4 flex flex-wrap gap-4">
-          <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-2">
-            <span className="text-sm text-white/50">Pending</span>
-            <span className="ml-2 text-lg font-semibold">{pendingCount}</span>
+      <div className="glass-card p-8 border-cyan-500/10">
+        <div className="flex justify-between items-start">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.4em] text-cyan-500/80">Clinical Operations</p>
+            <h1 className="mt-2 text-4xl font-extrabold tracking-tight text-white">Patient Queue</h1>
+            <p className="mt-2 text-slate-400 max-w-lg">Manage incoming diagnostic requests and provide expert clinical reviews to refine AI assessments.</p>
           </div>
-          <div className="rounded-xl border border-orange-500/30 bg-orange-500/10 px-4 py-2">
-            <span className="text-sm text-orange-300/70">Urgent / Emergency</span>
-            <span className="ml-2 text-lg font-semibold text-orange-300">{urgentCount}</span>
+          <div className="flex gap-4">
+            <div className="glass-card bg-white/5 border-white/5 px-6 py-4 flex flex-col items-center">
+              <span className="text-2xl font-bold text-white">{pendingCount}</span>
+              <span className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Pending</span>
+            </div>
+            <div className="glass-card bg-orange-500/10 border-orange-500/20 px-6 py-4 flex flex-col items-center">
+              <span className="text-2xl font-bold text-orange-400">{urgentCount}</span>
+              <span className="text-[10px] uppercase tracking-widest text-orange-500/60 font-bold">Urgent</span>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Feedback stats */}
       {stats && (
-        <div className="grid gap-4 sm:grid-cols-3">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
-            <p className="text-xs uppercase tracking-[0.2em] text-white/45">AI Approval Rate</p>
-            <p className="mt-2 text-3xl font-bold text-cyan-400">
-              {stats.approvalRate}%
+        <div className="grid gap-6 sm:grid-cols-3">
+          <div className="glass-card p-6 bg-cyan-500/5 hover:bg-cyan-500/10 transition-all">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-cyan-400 font-bold">AI Approval Rate</p>
+            <p className="mt-2 text-4xl font-black text-white">
+              {stats.approvalRate}<span className="text-lg text-cyan-500">%</span>
             </p>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
-            <p className="text-xs uppercase tracking-[0.2em] text-white/45">Total Reviews</p>
-            <p className="mt-2 text-3xl font-bold">{stats.total}</p>
+          <div className="glass-card p-6">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-bold">Total Reviews</p>
+            <p className="mt-2 text-4xl font-black text-white">{stats.total}</p>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
-            <p className="text-xs uppercase tracking-[0.2em] text-white/45">Corrections Made</p>
-            <p className="mt-2 text-3xl font-bold text-amber-400">{stats.aiCorrected}</p>
+          <div className="glass-card p-6">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-amber-500/80 font-bold">Corrections Made</p>
+            <p className="mt-2 text-4xl font-black text-white">{stats.aiCorrected}</p>
           </div>
         </div>
       )}
@@ -272,7 +311,7 @@ export default function DoctorQueuePage() {
             return (
               <article
                 key={req.id}
-                className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl transition-all duration-300 hover:border-white/20"
+                className="glass-card hover:bg-white/10 transition-all duration-300"
               >
                 {/* Card header */}
                 <div className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
@@ -343,6 +382,16 @@ export default function DoctorQueuePage() {
                         className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-5 py-2 text-sm font-semibold text-cyan-200 transition-all hover:border-cyan-400/50 hover:bg-cyan-500/20 disabled:opacity-50"
                       >
                         {claimingId === req.id ? "Claiming..." : "Claim"}
+                      </button>
+                    )}
+                    {req.status === "ASSIGNED" && req.doctorId === user?.id && (
+                      <button
+                        type="button"
+                        onClick={() => handleQuickSchedule(req)}
+                        className="flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-500 transition-all hover:scale-105 active:scale-95"
+                      >
+                        <Video className="h-4 w-4" />
+                        Start Live Session
                       </button>
                     )}
                     <button
