@@ -13,6 +13,21 @@ export class DoctorRequestsService {
 
   constructor(private readonly prisma: PrismaService) {}
 
+  private normalizeUrgency(urgency?: string): 'LOW' | 'NORMAL' | 'URGENT' | 'EMERGENCY' {
+    switch (urgency?.toUpperCase()) {
+      case 'LOW':
+        return 'LOW';
+      case 'URGENT':
+        return 'URGENT';
+      case 'EMERGENCY':
+        return 'EMERGENCY';
+      case 'MEDIUM':
+      case 'NORMAL':
+      default:
+        return 'NORMAL';
+    }
+  }
+
   async createRequest(
     patientId: string,
     data: { analysisId: string; specialty?: string; urgency?: string; notes?: string },
@@ -40,7 +55,7 @@ export class DoctorRequestsService {
         doctorId: doctor?.id || null,
         analysisId: data.analysisId,
         specialty: data.specialty,
-        urgency: (data.urgency as any) || 'NORMAL',
+        urgency: this.normalizeUrgency(data.urgency),
         status: doctor ? 'ASSIGNED' : 'PENDING',
         notes: data.notes,
       },

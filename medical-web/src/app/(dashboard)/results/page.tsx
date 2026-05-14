@@ -125,7 +125,7 @@ export default function ResultsPage() {
   const [reviews, setReviews] = useState<DoctorReview[]>([]);
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [requestSpecialty, setRequestSpecialty] = useState("");
-  const [requestUrgency, setRequestUrgency] = useState("MEDIUM");
+  const [requestUrgency, setRequestUrgency] = useState("NORMAL");
   const [requestNotes, setRequestNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [requestSuccess, setRequestSuccess] = useState(false);
@@ -398,7 +398,7 @@ export default function ResultsPage() {
                   className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 outline-none transition focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30"
                 >
                   <option value="LOW">Low -- routine review</option>
-                  <option value="MEDIUM">Medium -- within 24 hours</option>
+                  <option value="NORMAL">Normal -- within 24 hours</option>
                   <option value="URGENT">Urgent -- as soon as possible</option>
                 </select>
               </div>
